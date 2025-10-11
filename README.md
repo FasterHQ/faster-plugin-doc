@@ -1,0 +1,1 @@
+# faster-plugin-doc
