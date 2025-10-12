@@ -1,0 +1,808 @@
+---
+title: 'Models'
+description: 'Create database models with Bookshelf.js ORM'
+---
+
+## Overview
+
+Faster CMS plugins use Bookshelf.js, an ORM built on top of Knex.js, to interact with the database. Models represent database tables and handle data operations.
+
+<Info>
+  Models automatically integrate with the CMS database connection and support transactions, events, and relationships.
+</Info>
+
+## Creating a Model
+
+### Basic Model Structure
+
+```javascript models/Item.js
+const ghostBookshelf = require('../../../../core/server/models/base/index.js');
+
+let Item;
+let Items;
+
+Item = ghostBookshelf.Model.extend({
+    // Table name (use a prefix to avoid conflicts)
+    tableName: 'mp_items',
+
+    // Default values for new records
+    defaults: function defaults() {
+        return {
+            is_active: true,
+            is_featured: false,
+            sort_order: 0
+        };
+    },
+
+    // Lifecycle events
+    emitChange: function emitChange(event, options) {
+        const eventToTrigger = 'item' + '.' + event;
+        ghostBookshelf.Model.prototype.emitChange.bind(this)(this, eventToTrigger, options);
+    },
+
+    onCreated: function onCreated(model, options) {
+        ghostBookshelf.Model.prototype.onCreated.apply(this, arguments);
+        model.emitChange('added', options);
+    },
+
+    onUpdated: function onUpdated(model, options) {
+        ghostBookshelf.Model.prototype.onUpdated.apply(this, arguments);
+        model.emitChange('edited', options);
+    },
+
+    onDestroyed: function onDestroyed(model, options) {
+        ghostBookshelf.Model.prototype.onDestroyed.apply(this, arguments);
+        model.emitChange('deleted', options);
+    },
+
+    // Relationships
+    category: function category() {
+        return this.belongsTo('MPCategory', 'category_id');
+    },
+
+    attachments: function attachments() {
+        return this.hasMany('MPItemAttachment', 'item_id');
+    },
+
+    tags: function tags() {
+        return this.belongsToMany('MPTag', 'mp_item_tag', 'item_id', 'tag_id');
+    }
+}, {
+    // Static methods
+    permittedOptions: function permittedOptions(methodName) {
+        let options = ghostBookshelf.Model.permittedOptions.call(this, methodName);
+        const validOptions = {
+            findOne: ['filter', 'columns'],
+            findAll: ['filter', 'columns'],
+            findPage: ['filter', 'columns', 'page', 'limit', 'order']
+        };
+
+        if (validOptions[methodName]) {
+            options = options.concat(validOptions[methodName]);
+        }
+
+        return options;
+    }
+});
+
+// Collection (represents multiple records)
+Items = ghostBookshelf.Collection.extend({
+    model: Item
+});
+
+// Export and register
+module.exports = {
+    Item: ghostBookshelf.model('MPItem', Item),
+    Items: ghostBookshelf.collection('MPItems', Items)
+};
+```
+
+### Model Index File
+
+Create an index file to export all models:
+
+```javascript models/index.js
+module.exports = {
+    Item: require('./Item').Item,
+    Items: require('./Item').Items,
+    Category: require('./Category').Category,
+    Categories: require('./Category').Categories,
+    ItemAttachment: require('./ItemAttachment').ItemAttachment,
+    ItemAttachments: require('./ItemAttachment').ItemAttachments
+};
+```
+
+## Model Schema Definition
+
+Before creating models, you must define the database schema. The schema defines table structures, field types, constraints, and relationships.
+
+### Schema File Structure
+
+Create a `schema.js` file in your plugin's `models/` directory:
+
+```javascript models/schema.js
+module.exports = {
+    mp_items: {
+        id: {type: 'string', maxlength: 24, nullable: false, primary: true},
+        name: {type: 'string', maxlength: 191, nullable: false},
+        slug: {type: 'string', maxlength: 191, nullable: false, unique: true},
+        description: {type: 'text', maxlength: 65535, nullable: true},
+        is_active: {type: 'boolean', nullable: false, defaultTo: true},
+        is_featured: {type: 'boolean', nullable: false, defaultTo: false},
+        sort_order: {type: 'integer', nullable: false, unsigned: true, defaultTo: 0},
+        category_id: {
+            type: 'string',
+            maxlength: 24,
+            nullable: true,
+            references: 'mp_categories.id'
+        },
+        created_at: {type: 'dateTime', nullable: false},
+        updated_at: {type: 'dateTime', nullable: true}
+    },
+
+    mp_categories: {
+        id: {type: 'string', maxlength: 24, nullable: false, primary: true},
+        name: {type: 'string', maxlength: 191, nullable: false},
+        slug: {type: 'string', maxlength: 191, nullable: false, unique: true},
+        created_at: {type: 'dateTime', nullable: false},
+        updated_at: {type: 'dateTime', nullable: true}
+    },
+
+    mp_item_tag: {
+        id: {type: 'string', maxlength: 24, nullable: false, primary: true},
+        item_id: {
+            type: 'string',
+            maxlength: 24,
+            nullable: false,
+            references: 'mp_items.id'
+        },
+        tag_id: {
+            type: 'string',
+            maxlength: 24,
+            nullable: false,
+            references: 'mp_tags.id'
+        },
+        sort_order: {type: 'integer', nullable: false, unsigned: true, defaultTo: 0},
+        '@@INDEXES@@': [['item_id', 'tag_id']]
+    }
+};
+```
+
+<Note>
+  The CMS automatically loads schema definitions from `models/schema.js` in your plugin directory.
+</Note>
+
+### Field Types
+
+<CodeGroup>
+```javascript String Types
+// Small strings (max 50 characters)
+{type: 'string', maxlength: 50}
+
+// Medium strings (max 191 characters)
+{type: 'string', maxlength: 191}
+
+// Large strings (max 2000 characters)
+{type: 'string', maxlength: 2000}
+
+// Text (max 64 KiB)
+{type: 'text', maxlength: 65535}
+
+// Long text (max 1 GB)
+{type: 'text', maxlength: 1000000000, fieldtype: 'long'}
+```
+
+```javascript Numeric Types
+// Integer
+{type: 'integer', nullable: false}
+
+// Unsigned integer (positive only)
+{type: 'integer', unsigned: true, defaultTo: 0}
+
+// Big integer (for timestamps)
+{type: 'bigInteger', nullable: false}
+```
+
+```javascript Other Types
+// Boolean
+{type: 'boolean', nullable: false, defaultTo: false}
+
+// DateTime
+{type: 'dateTime', nullable: false}
+```
+</CodeGroup>
+
+### Field Attributes
+
+| Attribute | Description | Example |
+|-----------|-------------|---------|
+| **type** | Data type (string, text, integer, boolean, dateTime, bigInteger) | `type: 'string'` |
+| **maxlength** | Maximum length for strings/text | `maxlength: 191` |
+| **nullable** | Whether field can be null | `nullable: false` |
+| **primary** | Mark as primary key | `primary: true` |
+| **unique** | Enforce unique constraint | `unique: true` |
+| **defaultTo** | Default value | `defaultTo: true` |
+| **unsigned** | Positive integers only | `unsigned: true` |
+| **index** | Create database index | `index: true` |
+| **fieldtype** | Additional type info | `fieldtype: 'long'` |
+| **references** | Foreign key reference | `references: 'mp_items.id'` |
+| **cascadeDelete** | Delete child records when parent is deleted | `cascadeDelete: true` |
+| **setNullDelete** | Set to null when referenced record is deleted | `setNullDelete: true` |
+
+### Validations
+
+Add validation rules to ensure data integrity:
+
+```javascript
+{
+    type: 'string',
+    maxlength: 191,
+    nullable: false,
+    unique: true,
+    validations: {
+        isEmail: true  // Validate email format
+    }
+}
+```
+
+Available validations:
+
+<CodeGroup>
+```javascript Email Validation
+{
+    type: 'string',
+    maxlength: 191,
+    validations: {isEmail: true}
+}
+```
+
+```javascript UUID Validation
+{
+    type: 'string',
+    maxlength: 36,
+    validations: {isUUID: true}
+}
+```
+
+```javascript Length Validation
+{
+    type: 'string',
+    maxlength: 2000,
+    validations: {
+        isLength: {min: 3, max: 300}
+    }
+}
+```
+
+```javascript Enum Validation
+{
+    type: 'string',
+    maxlength: 50,
+    validations: {
+        isIn: [['active', 'inactive', 'pending']]
+    }
+}
+```
+
+```javascript URL Validation
+{
+    type: 'string',
+    maxlength: 2000,
+    validations: {isEmptyOrURL: true}
+}
+```
+</CodeGroup>
+
+### Indexes and Constraints
+
+Define composite indexes and unique constraints:
+
+```javascript
+{
+    mp_items: {
+        id: {type: 'string', maxlength: 24, nullable: false, primary: true},
+        name: {type: 'string', maxlength: 191, nullable: false},
+        slug: {type: 'string', maxlength: 191, nullable: false},
+        status: {type: 'string', maxlength: 50, nullable: false},
+        updated_at: {type: 'dateTime', nullable: true, index: true},
+
+        // Composite indexes for query performance
+        '@@INDEXES@@': [
+            ['status', 'updated_at'],
+            ['slug', 'status']
+        ],
+
+        // Unique constraints
+        '@@UNIQUE_CONSTRAINTS@@': [
+            ['slug', 'status']
+        ]
+    }
+}
+```
+
+### Foreign Key Relationships
+
+Define relationships between tables:
+
+<CodeGroup>
+```javascript One-to-Many
+// Item belongs to Category
+{
+    mp_items: {
+        category_id: {
+            type: 'string',
+            maxlength: 24,
+            nullable: true,
+            references: 'mp_categories.id'
+        }
+    }
+}
+```
+
+```javascript Many-to-Many (Junction Table)
+// Items and Tags relationship
+{
+    mp_item_tag: {
+        id: {type: 'string', maxlength: 24, nullable: false, primary: true},
+        item_id: {
+            type: 'string',
+            maxlength: 24,
+            nullable: false,
+            references: 'mp_items.id',
+            cascadeDelete: true
+        },
+        tag_id: {
+            type: 'string',
+            maxlength: 24,
+            nullable: false,
+            references: 'mp_tags.id',
+            cascadeDelete: true
+        }
+    }
+}
+```
+
+```javascript Cascade Delete
+// Delete children when parent is deleted
+{
+    attachment_id: {
+        type: 'string',
+        maxlength: 24,
+        nullable: false,
+        references: 'mp_items.id',
+        cascadeDelete: true  // Deletes attachment when item is deleted
+    }
+}
+```
+
+```javascript Set Null on Delete
+// Set to null when referenced record is deleted
+{
+    author_id: {
+        type: 'string',
+        maxlength: 24,
+        nullable: true,
+        references: 'users.id',
+        setNullDelete: true  // Sets to null instead of deleting
+    }
+}
+```
+</CodeGroup>
+
+### String Size Guidelines
+
+<Info>
+  Follow these conventions for string field sizes:
+</Info>
+
+| Size | Max Length | Use Case | Example |
+|------|-----------|----------|---------|
+| **Small** | 50 | Short identifiers, codes | Status, type, role |
+| **Medium** | 191 | Names, slugs, emails | Name, slug, email |
+| **Large** | 2000 | URLs, descriptions | URL, excerpt |
+| **Text** | 65535 | Large text content | Description, bio |
+| **Long Text** | 1000000000 | Very large content | Post content, JSON |
+
+### Complete Schema Example
+
+Here's a complete example with all features:
+
+```javascript models/schema.js
+module.exports = {
+    mp_items: {
+        // Primary key (always required)
+        id: {type: 'string', maxlength: 24, nullable: false, primary: true},
+
+        // Basic fields
+        name: {
+            type: 'string',
+            maxlength: 191,
+            nullable: false,
+            validations: {isLength: {min: 3, max: 191}}
+        },
+        slug: {
+            type: 'string',
+            maxlength: 191,
+            nullable: false,
+            unique: true
+        },
+
+        // Text fields
+        description: {type: 'text', maxlength: 65535, nullable: true},
+        content: {
+            type: 'text',
+            maxlength: 1000000000,
+            fieldtype: 'long',
+            nullable: true
+        },
+
+        // Boolean flags
+        is_active: {type: 'boolean', nullable: false, defaultTo: true},
+        is_featured: {type: 'boolean', nullable: false, defaultTo: false},
+
+        // Numeric fields
+        sort_order: {type: 'integer', unsigned: true, nullable: false, defaultTo: 0},
+        view_count: {type: 'integer', unsigned: true, nullable: false, defaultTo: 0},
+
+        // Enum field
+        status: {
+            type: 'string',
+            maxlength: 50,
+            nullable: false,
+            defaultTo: 'draft',
+            validations: {
+                isIn: [['draft', 'published', 'archived']]
+            }
+        },
+
+        // Foreign key
+        category_id: {
+            type: 'string',
+            maxlength: 24,
+            nullable: true,
+            references: 'mp_categories.id'
+        },
+
+        // Timestamps
+        created_at: {type: 'dateTime', nullable: false},
+        updated_at: {type: 'dateTime', nullable: true, index: true},
+        published_at: {type: 'dateTime', nullable: true},
+
+        // Composite indexes
+        '@@INDEXES@@': [
+            ['status', 'updated_at'],
+            ['category_id', 'is_active']
+        ]
+    },
+
+    mp_item_attachments: {
+        id: {type: 'string', maxlength: 24, nullable: false, primary: true},
+        item_id: {
+            type: 'string',
+            maxlength: 24,
+            nullable: false,
+            references: 'mp_items.id',
+            cascadeDelete: true
+        },
+        url: {type: 'string', maxlength: 2000, nullable: false},
+        type: {type: 'string', maxlength: 50, nullable: false},
+        created_at: {type: 'dateTime', nullable: false}
+    }
+};
+```
+
+## Model Naming Conventions
+
+<Note>
+  Follow these naming conventions to avoid conflicts and maintain consistency:
+</Note>
+
+| Convention | Example | Purpose |
+|------------|---------|---------|
+| **Table Names** | `mp_items` | Lowercase, plural, with plugin prefix |
+| **Model Class** | `Item` | PascalCase, singular |
+| **Collection Class** | `Items` | PascalCase, plural |
+| **Model Name** | `MPItem` | PascalCase with prefix |
+| **Collection Name** | `MPItems` | PascalCase plural with prefix |
+
+## Relationships
+
+### One-to-Many (hasMany)
+
+An item has many attachments:
+
+<CodeGroup>
+```javascript Item Model
+attachments: function attachments() {
+    return this.hasMany('MPItemAttachment', 'item_id');
+}
+```
+
+```javascript Usage
+const item = await Item.findOne({id}, {
+    withRelated: ['attachments']
+});
+
+const attachments = item.related('attachments');
+```
+</CodeGroup>
+
+### Belongs-To (belongsTo)
+
+An item belongs to a category:
+
+<CodeGroup>
+```javascript Item Model
+category: function category() {
+    return this.belongsTo('MPCategory', 'category_id');
+}
+```
+
+```javascript Usage
+const item = await Item.findOne({id}, {
+    withRelated: ['category']
+});
+
+const category = item.related('category');
+```
+</CodeGroup>
+
+### Many-to-Many (belongsToMany)
+
+Items have many tags, tags have many items:
+
+<CodeGroup>
+```javascript Item Model
+tags: function tags() {
+    return this.belongsToMany(
+        'MPTag',              // Related model
+        'mp_item_tag',        // Junction table
+        'item_id',            // Foreign key in junction
+        'tag_id'              // Related key in junction
+    );
+}
+```
+
+```javascript Usage
+// Get item with tags
+const item = await Item.findOne({id}, {
+    withRelated: ['tags']
+});
+
+// Attach tags to item
+await item.tags().attach([tagId1, tagId2]);
+
+// Detach specific tags
+await item.tags().detach([tagId1]);
+
+// Detach all tags
+await item.tags().detach();
+```
+</CodeGroup>
+
+## CRUD Operations
+
+### Create
+
+<CodeGroup>
+```javascript Simple Create
+const item = await Item.add({
+    name: 'Example Item',
+    slug: 'example-item',
+    description: 'An example item',
+    is_active: true
+});
+```
+
+```javascript With Transaction
+const item = await Item.add(data, {
+    transacting: transaction
+});
+```
+</CodeGroup>
+
+### Read
+
+<CodeGroup>
+```javascript Find One
+const item = await Item.findOne({
+    slug: 'example-item'
+}, {
+    require: true,  // Throw error if not found
+    withRelated: ['category', 'attachments']
+});
+```
+
+```javascript Find All
+const items = await Item.findAll({
+    is_active: true
+}, {
+    withRelated: ['category'],
+    order: 'created_at DESC'
+});
+```
+
+```javascript Find Page (with pagination)
+const result = await Item.findPage({
+    page: 1,
+    limit: 20,
+    filter: 'is_active:true',
+    order: 'name ASC'
+});
+
+// Result contains:
+// - data: array of items
+// - meta: { pagination: { page, limit, pages, total } }
+```
+</CodeGroup>
+
+### Update
+
+<CodeGroup>
+```javascript Update by ID
+const item = await Item.edit({
+    name: 'Updated Name',
+    description: 'Updated description'
+}, {
+    id: itemId,
+    require: true
+});
+```
+
+```javascript Update with Transaction
+const item = await Item.edit(data, {
+    id: itemId,
+    transacting: transaction
+});
+```
+</CodeGroup>
+
+### Delete
+
+<CodeGroup>
+```javascript Hard Delete
+await Item.destroy({
+    id: itemId,
+    require: true
+});
+```
+
+```javascript Soft Delete (if deleted_at column exists)
+await Item.edit({
+    deleted_at: new Date()
+}, {
+    id: itemId
+});
+```
+</CodeGroup>
+
+## Advanced Queries
+
+### Filtering
+
+```javascript
+// Filter by field
+const items = await Item.findAll({
+    is_active: true,
+    is_featured: true
+});
+
+// Complex filters using filter option
+const items = await Item.findPage({
+    filter: 'is_active:true+is_featured:true',
+    page: 1,
+    limit: 20
+});
+```
+
+### Eager Loading (Avoid N+1 Queries)
+
+<Warning>
+  Always use `withRelated` to avoid N+1 query problems!
+</Warning>
+
+<CodeGroup>
+```javascript ❌ Bad (N+1 queries)
+const items = await Item.findAll();
+
+for (const item of items.models) {
+    const category = await item.related('category').fetch();
+    const attachments = await item.related('attachments').fetch();
+}
+```
+
+```javascript ✅ Good (single query with joins)
+const items = await Item.findAll({}, {
+    withRelated: ['category', 'attachments']
+});
+
+for (const item of items.models) {
+    const category = item.related('category');
+    const attachments = item.related('attachments');
+}
+```
+</CodeGroup>
+
+### Custom Queries
+
+For complex queries, use the underlying Knex connection:
+
+```javascript
+const db = require('@tryghost/database').getConnection();
+
+const items = await db('mp_items')
+    .join('mp_categories', 'mp_items.category_id', 'mp_categories.id')
+    .where('mp_items.is_active', true)
+    .where('mp_categories.is_active', true)
+    .select('mp_items.*', 'mp_categories.name as category_name');
+```
+
+## Transactions
+
+Always use transactions for multi-step operations:
+
+```javascript
+const ghostBookshelf = require('../../../../core/server/models/base/index.js');
+
+async function createItemWithAttachments(itemData, attachmentUrls) {
+    return await ghostBookshelf.transaction(async (transaction) => {
+        // Create item
+        const item = await Item.add(itemData, {
+            transacting: transaction
+        });
+
+        // Create attachments
+        for (const url of attachmentUrls) {
+            await ItemAttachment.add({
+                item_id: item.id,
+                url: url
+            }, {
+                transacting: transaction
+            });
+        }
+
+        return item;
+    });
+}
+```
+
+<Tip>
+  If any operation fails, the entire transaction is rolled back automatically.
+</Tip>
+
+## Events
+
+Listen to model changes:
+
+```javascript
+const events = require('@tryghost/events');
+
+// Listen for item creation
+events.on('item.added', async (model) => {
+    console.log('New item created:', model.get('name'));
+
+    // Update search index
+    await searchService.indexItem(model);
+});
+
+// Listen for item updates
+events.on('item.edited', async (model) => {
+    console.log('Item updated:', model.get('name'));
+});
+
+// Listen for item deletion
+events.on('item.deleted', async (model) => {
+    console.log('Item deleted:', model.get('name'));
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Migrations" icon="code-branch" href="/building/migrations">
+    Create database tables with migrations
+  </Card>
+  <Card title="Services" icon="gears" href="/building/services">
+    Add business logic with services
+  </Card>
+</CardGroup>

@@ -1,0 +1,85 @@
+---
+title: 'Plugin Setup'
+description: 'Set up your plugin development environment'
+---
+
+## Prerequisites
+
+<AccordionGroup>
+  <Accordion title="Node.js 18+" icon="node-js">
+    ```bash
+    node --version  # Should be 18.x or higher
+    ```
+  </Accordion>
+
+  <Accordion title="Faster CMS" icon="ghost">
+    ```bash
+    npm install -g ghost-cli
+    ghost install local
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Create Plugin
+
+```bash
+cd ghost/core/content/plugins
+mkdir my-plugin
+cd my-plugin
+```
+
+## Essential Files
+
+<Steps>
+  <Step title="manifest.json">
+    ```json
+    {
+      "name": "My Plugin",
+      "package_name": "my-plugin",
+      "version": "1.0.0",
+      "routing": "myplugin",
+      "permissions": ["admin", "database"]
+    }
+    ```
+  </Step>
+
+  <Step title="index.js">
+    ```javascript
+    const {BasePlugin} = require('@tryghost/plugin-sdk');
+
+    class MyPlugin extends BasePlugin {
+        constructor() {
+            super({name: 'my-plugin', version: '1.0.0', pluginPath: __dirname});
+        }
+
+        async onInit() {
+            this.debug('Plugin initialized');
+        }
+    }
+
+    module.exports = new MyPlugin();
+    ```
+  </Step>
+
+  <Step title="routes.js">
+    ```javascript
+    const {PluginRouter} = require('@tryghost/plugin-sdk');
+    const router = new PluginRouter('myplugin');
+
+    router.public('get', '/', (req, res) => {
+        res.send('<h1>My Plugin</h1>');
+    });
+
+    module.exports = {router: () => router.router()};
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Manifest" href="/building/manifest">Configure metadata</Card>
+  <Card title="Routes" href="/building/routes">Create routes</Card>
+  <Card title="Models" href="/building/models">Add database</Card>
+  <Card title="Controllers" href="/building/controllers">Handle requests</Card>
+</CardGroup>

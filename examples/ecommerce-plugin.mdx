@@ -1,0 +1,128 @@
+---
+title: 'E-commerce Plugin'
+description: 'Complete production-ready e-commerce plugin example'
+---
+
+## Overview
+
+The **faster-ecommerce** plugin is a complete, production-ready e-commerce system demonstrating advanced plugin development patterns.
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Product Management" icon="box">
+    Simple and variable products with attributes
+  </Card>
+  <Card title="Shopping Cart" icon="cart-shopping">
+    Guest and member cart with automatic merging
+  </Card>
+  <Card title="Orders" icon="receipt">
+    Complete order management workflow
+  </Card>
+  <Card title="Payments" icon="credit-card">
+    Stripe and COD provider integration
+  </Card>
+  <Card title="Inventory" icon="warehouse">
+    Stock tracking and management
+  </Card>
+  <Card title="Admin Panel" icon="desktop">
+    React/TypeScript admin interface
+  </Card>
+</CardGroup>
+
+## Architecture Highlights
+
+### Provider Pattern
+
+```javascript
+// Base payment provider
+class BaseProvider {
+    async createPayment(amount, metadata) {
+        throw new Error('Must implement');
+    }
+}
+
+// Concrete provider
+class StripeProvider extends BaseProvider {
+    async createPayment(amount, metadata) {
+        return await this.stripe.paymentIntents.create({...});
+    }
+}
+
+// Registry
+registry.register('stripe', StripeProvider);
+```
+
+### Repository Pattern
+
+```javascript
+class ProductRepository {
+    async findById(id, relations, transacting) {
+        return await Product.findOne({id}, {
+            withRelated: relations,
+            transacting
+        });
+    }
+
+    async createWithVariants(data, transacting) {
+        // Complex multi-step operation
+    }
+}
+```
+
+### Service Layer
+
+```javascript
+class OrderService {
+    async createOrder(cartId, memberId, shipping) {
+        return await ghostBookshelf.transaction(async (t) => {
+            const cart = await this.getCart(cartId, t);
+            await this.validateInventory(cart, t);
+            const order = await this.createOrderRecord(cart, t);
+            await this.updateInventory(cart, t);
+            await this.clearCart(cartId, t);
+            return order;
+        });
+    }
+}
+```
+
+## Source Code
+
+View the complete source in this repository:
+- Models: `models/`
+- Controllers: `controllers/`
+- Services: `services/`
+- Admin UI: `admin/`
+- Views: `views/`
+
+## Key Learnings
+
+<AccordionGroup>
+  <Accordion title="Transactions are Critical">
+    Always use transactions for multi-step operations to ensure data consistency.
+  </Accordion>
+
+  <Accordion title="Service Layer Benefits">
+    Separating business logic into services makes code testable and reusable.
+  </Accordion>
+
+  <Accordion title="Repository Pattern">
+    Abstracting data access allows for easier testing and modifications.
+  </Accordion>
+
+  <Accordion title="Provider Pattern for Extensibility">
+    The provider pattern makes it easy to add new payment methods without changing core code.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Start Building" href="/building/setup">
+    Create your own plugin
+  </Card>
+  <Card title="Architecture Guide" href="/architecture">
+    Learn the patterns used
+  </Card>
+</CardGroup>

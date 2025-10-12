@@ -1,0 +1,122 @@
+---
+title: 'Plugin Class'
+description: 'Build your main plugin class with lifecycle hooks'
+---
+
+## BasePlugin Class
+
+All plugins extend the `BasePlugin` class from `@tryghost/plugin-sdk`.
+
+```javascript index.js
+const {BasePlugin} = require('@tryghost/plugin-sdk');
+const errors = require('@tryghost/errors');
+
+class MyPlugin extends BasePlugin {
+    constructor() {
+        super({
+            name: 'my-plugin',
+            version: '1.0.0',
+            pluginPath: __dirname
+        });
+    }
+
+    async onInit() {
+        // Initialize services, register providers
+    }
+
+    async onActivate() {
+        // Register with external systems
+    }
+
+    getDefaultSettings() {
+        return {
+            enabled: true
+        };
+    }
+
+    async _validateSettings(settings) {
+        // Validate settings before saving
+        return settings;
+    }
+}
+
+module.exports = new MyPlugin();
+```
+
+##Lifecycle Hooks
+
+<CardGroup cols={2}>
+  <Card title="constructor()" icon="cube">
+    First method called, initialize instance variables
+  </Card>
+  <Card title="onInit()" icon="play">
+    Register services and providers
+  </Card>
+  <Card title="onActivate()" icon="check">
+    Register with external systems
+  </Card>
+  <Card title="getDefaultSettings()" icon="gear">
+    Define default configuration
+  </Card>
+</CardGroup>
+
+## Service Registration
+
+```javascript
+async onInit() {
+    const MyService = require('./services/MyService');
+    this.registerService('myService', new MyService(this));
+
+    // Access later
+    const service = this.getService('myService');
+}
+```
+
+## Settings Management
+
+```javascript
+getDefaultSettings() {
+    return {
+        apiKey: '',
+        enabled: true,
+        maxItems: 100
+    };
+}
+
+async _validateSettings(settings) {
+    if (settings.maxItems < 1) {
+        throw new errors.ValidationError({
+            message: 'maxItems must be positive'
+        });
+    }
+    return settings;
+}
+
+// Access settings anywhere
+const settings = this.getSettings();
+```
+
+## Debug Logging
+
+```javascript
+async onInit() {
+    this.debug('Initializing plugin');
+    this.debug('Settings:', this.getSettings());
+}
+```
+
+Enable logs:
+```bash
+DEBUG=ghost:* ghost start
+```
+
+## Complete Example
+
+See [Plugin Lifecycle](/core-concepts/plugin-lifecycle) for a complete working example.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Routes" href="/building/routes">Create routes</Card>
+  <Card title="Lifecycle" href="/core-concepts/plugin-lifecycle">Understand lifecycle</Card>
+</CardGroup>

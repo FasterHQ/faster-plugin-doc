@@ -1,0 +1,1179 @@
+---
+title: 'Admin Panel'
+description: 'Build admin interfaces for your plugin with schema-based or custom UI approaches'
+---
+
+## Overview
+
+Faster CMS provides two approaches to build admin panels for your plugin:
+
+1. **Schema-Based Admin** - Define data models using a declarative schema (quickest, recommended for CRUD operations)
+2. **Custom UI Admin** - Build fully custom React interfaces (maximum flexibility for complex UIs)
+
+<Info>
+  Schema-based admin automatically generates CRUD interfaces, while custom UI gives you complete control over the interface.
+</Info>
+
+## How Faster CMS Determines Admin Type
+
+Faster CMS determines whether to use schema-based or custom UI based on the `type` attribute in your admin schema.
+
+### Schema-Based UI (Default)
+
+By default, all models use auto-generated schema-based UI:
+
+```javascript schema/admin-schema.js
+const modelSchemas = {
+    categories: {
+        name: 'categories',
+        displayName: 'Categories',
+        tableName: 'my_plugin_categories',
+        icon: '📁',
+        fields: [ /* field definitions */ ],
+        actions: ['create', 'read', 'update', 'delete'],
+        listView: {
+            columns: ['name', 'slug', 'is_active'],
+            // No type specified = auto-generated UI
+        },
+        formView: {
+            sections: [ /* sections */ ]
+            // No type specified = auto-generated UI
+        }
+    }
+};
+```
+
+**Result**: Faster CMS auto-generates list and form interfaces
+
+### Custom UI
+
+To use custom React components, add `type: 'custom'` to `listView` and/or `formView`:
+
+```javascript schema/admin-schema.js
+const modelSchemas = {
+    orders: {
+        name: 'orders',
+        displayName: 'Orders',
+        tableName: 'my_plugin_orders',
+        icon: '🛒',
+        fields: [ /* field definitions */ ],
+        actions: ['read', 'update'],
+        listView: {
+            type: 'custom',  // Use custom Listing.tsx component
+            columns: ['order_number', 'customer_email', 'total', 'status'],
+        },
+        formView: {
+            type: 'custom',  // Use custom CreateOrEdit.tsx component
+            sections: [ /* sections */ ]
+        }
+    }
+};
+```
+
+**Result**: Faster CMS looks for custom components at:
+- `admin/orders/Listing.tsx` (for list view)
+- `admin/orders/CreateOrEdit.tsx` (for form view)
+
+### Mix and Match
+
+You can use custom UI for list view and schema-based for form view (or vice versa):
+
+```javascript
+listView: {
+    type: 'custom',  // Custom listing
+    columns: ['name', 'status']
+},
+formView: {
+    // No type = auto-generated form
+    sections: [ /* sections */ ]
+}
+```
+
+### Complete Example
+
+```javascript schema/admin-schema.js
+const modelSchemas = {
+    // Schema-based admin
+    products: {
+        name: 'products',
+        displayName: 'Products',
+        listView: {
+            columns: ['name', 'price', 'stock']
+            // Auto-generated UI
+        },
+        formView: {
+            sections: [ /* sections */ ]
+            // Auto-generated UI
+        }
+    },
+
+    // Custom admin
+    orders: {
+        name: 'orders',
+        displayName: 'Orders',
+        listView: {
+            type: 'custom',  // Custom UI
+            columns: ['order_number', 'total']
+        },
+        formView: {
+            type: 'custom',  // Custom UI
+            sections: [ /* sections */ ]
+        }
+    }
+};
+
+module.exports = { modelSchemas };
+```
+
+**Directory Structure**:
+
+```bash
+your-plugin/
+├── schema/
+│   └── admin-schema.js
+└── admin/
+    └── orders/
+        ├── Listing.tsx        # Custom UI for orders list
+        └── CreateOrEdit.tsx   # Custom UI for orders form
+```
+
+## Schema-Based Admin
+
+Schema-based admin uses a declarative configuration to automatically generate admin interfaces for your data models.
+
+### Directory Structure
+
+```bash
+your-plugin/
+├── schema/
+│   └── admin-schema.js       # Admin model definitions
+└── index.js                  # Plugin entry point
+```
+
+### Basic Schema Example
+
+```javascript schema/admin-schema.js
+const modelSchemas = {
+    items: {
+        name: 'items',
+        displayName: 'Items',
+        tableName: 'my_plugin_items',
+        icon: '📦',
+        fields: [
+            {name: 'id', type: 'string', primary: true, hidden: true},
+            {name: 'name', type: 'string', required: true, label: 'Item Name', maxLength: 255},
+            {name: 'description', type: 'text', label: 'Description'},
+            {name: 'price', type: 'number', format: 'currency', required: true, label: 'Price', min: 0},
+            {name: 'is_active', type: 'boolean', label: 'Active', default: true},
+            {name: 'created_at', type: 'datetime', hidden: true, auto: true},
+            {name: 'updated_at', type: 'datetime', hidden: true, auto: true}
+        ],
+        actions: ['create', 'read', 'update', 'delete'],
+        listView: {
+            columns: ['name', 'price', 'is_active'],
+            searchable: ['name', 'description'],
+            sortable: ['name', 'price', 'created_at'],
+            defaultSort: {field: 'name', order: 'asc'}
+        },
+        formView: {
+            sections: [
+                {
+                    title: 'Basic Information',
+                    fields: ['name', 'description']
+                },
+                {
+                    title: 'Pricing',
+                    fields: ['price', 'is_active']
+                }
+            ]
+        }
+    }
+};
+
+module.exports = {
+    modelSchemas
+};
+```
+
+## Model Schema Attributes
+
+### Top-Level Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | Model identifier (lowercase, no spaces) |
+| `displayName` | string | Yes | Human-readable name shown in admin |
+| `tableName` | string | Yes | Database table name |
+| `icon` | string | No | Emoji or icon for the model |
+| `fields` | array | Yes | Array of field definitions |
+| `actions` | array | No | Allowed actions: `create`, `read`, `update`, `delete` |
+| `listView` | object | No | List view configuration |
+| `formView` | object | No | Form view configuration |
+| `validations` | object | No | Custom validation rules |
+
+## Field Types
+
+### Text Fields
+
+<CodeGroup>
+```javascript String
+{
+    name: 'name',
+    type: 'string',
+    label: 'Item Name',
+    required: true,
+    maxLength: 255,
+    placeholder: 'Enter name',
+    help: 'A unique name for the item'
+}
+```
+
+```javascript Text (Multi-line)
+{
+    name: 'description',
+    type: 'text',
+    label: 'Description',
+    placeholder: 'Enter description',
+    rows: 5
+}
+```
+
+```javascript Email
+{
+    name: 'email',
+    type: 'email',
+    label: 'Email Address',
+    required: true,
+    unique: true
+}
+```
+</CodeGroup>
+
+### Number Fields
+
+<CodeGroup>
+```javascript Number
+{
+    name: 'quantity',
+    type: 'number',
+    label: 'Quantity',
+    min: 0,
+    max: 9999,
+    default: 1
+}
+```
+
+```javascript Currency
+{
+    name: 'price',
+    type: 'number',
+    format: 'currency',
+    label: 'Price',
+    required: true,
+    min: 0
+}
+```
+
+```javascript With Unit
+{
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    unit: 'minutes',
+    min: 5,
+    default: 30
+}
+```
+</CodeGroup>
+
+### Boolean Fields
+
+```javascript
+{
+    name: 'is_active',
+    type: 'boolean',
+    label: 'Active',
+    default: true,
+    help: 'Enable or disable this item'
+}
+```
+
+### Select Fields
+
+```javascript
+{
+    name: 'status',
+    type: 'select',
+    label: 'Status',
+    options: [
+        {value: 'pending', label: 'Pending', color: 'orange'},
+        {value: 'approved', label: 'Approved', color: 'green'},
+        {value: 'rejected', label: 'Rejected', color: 'red'}
+    ],
+    default: 'pending',
+    help: 'Current status of the item'
+}
+```
+
+### Date and Time Fields
+
+<CodeGroup>
+```javascript Date
+{
+    name: 'event_date',
+    type: 'date',
+    label: 'Event Date',
+    required: true
+}
+```
+
+```javascript Time
+{
+    name: 'start_time',
+    type: 'time',
+    label: 'Start Time',
+    required: true,
+    default: '09:00'
+}
+```
+
+```javascript DateTime
+{
+    name: 'created_at',
+    type: 'datetime',
+    label: 'Created At',
+    auto: true,
+    hidden: true
+}
+```
+</CodeGroup>
+
+### Media Fields
+
+<CodeGroup>
+```javascript Image
+{
+    name: 'featured_image',
+    type: 'image',
+    label: 'Featured Image',
+    maxLength: 2000,
+    help: 'Upload an image for this item'
+}
+```
+
+```javascript File
+{
+    name: 'attachment',
+    type: 'file',
+    label: 'Attachment',
+    accept: '.pdf,.doc,.docx',
+    maxSize: 5242880  // 5MB in bytes
+}
+```
+</CodeGroup>
+
+### Relation Fields
+
+<CodeGroup>
+```javascript Single Relation
+{
+    name: 'category_id',
+    type: 'relation',
+    relation: 'categories',
+    label: 'Category',
+    required: true,
+    displayField: 'name',
+    foreignKey: true
+}
+```
+
+```javascript Multiple Relations
+{
+    name: 'tag_ids',
+    type: 'json',
+    label: 'Tags',
+    multiple: true,
+    relation: 'tags',
+    displayField: 'name',
+    default: []
+}
+```
+</CodeGroup>
+
+### Special Fields
+
+<CodeGroup>
+```javascript JSON Field
+{
+    name: 'metadata',
+    type: 'json',
+    label: 'Metadata',
+    help: 'Additional data in JSON format'
+}
+```
+
+```javascript Info Field (Virtual)
+{
+    name: 'note_field',
+    type: 'info',
+    label: 'ℹ️ Note',
+    content: 'This is an informational message',
+    virtual: true
+}
+```
+
+```javascript Computed Field (Virtual)
+{
+    name: 'total_capacity',
+    type: 'computed',
+    label: 'Total Capacity',
+    virtual: true,
+    help: 'Auto-calculated value'
+}
+```
+</CodeGroup>
+
+## Field Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Field identifier (matches database column) |
+| `type` | string | Field type (string, number, boolean, select, etc.) |
+| `label` | string | Display label in forms |
+| `required` | boolean | Whether field is required |
+| `primary` | boolean | Mark as primary key |
+| `hidden` | boolean | Hide from forms (still in database) |
+| `readOnly` | boolean | Display only, not editable |
+| `readOnlyOnEdit` | boolean | Read-only when editing (editable on create) |
+| `unique` | boolean | Enforce unique constraint |
+| `default` | any | Default value for new records |
+| `placeholder` | string | Placeholder text |
+| `help` | string | Help text shown below field |
+| `maxLength` | number | Maximum string length |
+| `min` | number | Minimum numeric value |
+| `max` | number | Maximum numeric value |
+| `pattern` | string | Regex pattern for validation |
+| `format` | string | Special format (currency, email, etc.) |
+| `unit` | string | Unit label (minutes, kg, etc.) |
+| `auto` | boolean | Auto-generated value |
+| `virtual` | boolean | Not stored in database |
+| `nullable` | boolean | Allow null values |
+
+## Conditional Fields
+
+Show fields based on other field values:
+
+```javascript
+{
+    name: 'discount_amount',
+    type: 'number',
+    label: 'Discount Amount',
+    conditional: {field: 'has_discount', value: true},
+    help: 'Only shown when discount is enabled'
+}
+
+// Conditional by category type
+{
+    name: 'event_duration',
+    type: 'number',
+    label: 'Duration (minutes)',
+    conditional: {categoryType: 'event'},
+    min: 5
+}
+```
+
+## List View Configuration
+
+```javascript
+listView: {
+    type: 'custom',  // Optional: Use 'custom' for custom UI, omit for auto-generated UI
+    columns: ['name', 'email', 'status', 'created_at'],
+    searchable: ['name', 'email', 'description'],
+    sortable: ['name', 'email', 'created_at'],
+    defaultSort: {field: 'created_at', order: 'desc'},
+    filters: ['status', 'category_id']
+}
+```
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `type` | string | `'custom'` to use custom Listing.tsx component, omit for auto-generated UI |
+| `columns` | array | Fields to display in table |
+| `searchable` | array | Fields to include in search |
+| `sortable` | array | Fields that can be sorted |
+| `defaultSort` | object | Default sort configuration |
+| `filters` | array | Fields to show as filters |
+
+## Form View Configuration
+
+Organize form fields into sections:
+
+```javascript
+formView: {
+    type: 'custom',  // Optional: Use 'custom' for custom UI, omit for auto-generated UI
+    sections: [
+        {
+            title: 'Basic Information',
+            fields: ['name', 'email', 'phone']
+        },
+        {
+            title: 'Address Details',
+            fields: ['address_line1', 'city', 'postal_code']
+        },
+        {
+            title: 'Settings',
+            fields: ['is_active', 'notifications_enabled']
+        }
+    ]
+}
+```
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `type` | string | `'custom'` to use custom CreateOrEdit.tsx component, omit for auto-generated UI |
+| `sections` | array | Form sections with title and fields |
+
+## Dynamic Labels
+
+Change labels based on field values:
+
+```javascript
+{
+    name: 'max_capacity',
+    type: 'number',
+    label: 'Capacity',
+    dynamicLabel: {
+        ticket: 'Total Tickets Available',
+        slot: 'Capacity Per Time Slot'
+    },
+    help: 'Label changes based on booking type'
+}
+```
+
+## Custom Validations
+
+```javascript
+validations: {
+    event_date: {
+        custom: 'mustBeFutureDate',
+        message: 'Event date must be in the future'
+    },
+    start_time: {
+        custom: 'mustBeWithinBusinessHours',
+        message: 'Time must be within business hours'
+    }
+}
+```
+
+## Complete Schema Example
+
+```javascript schema/admin-schema.js
+const modelSchemas = {
+    products: {
+        name: 'products',
+        displayName: 'Products',
+        tableName: 'shop_products',
+        icon: '🛍️',
+        fields: [
+            {name: 'id', type: 'string', primary: true, hidden: true},
+            {name: 'name', type: 'string', required: true, label: 'Product Name', maxLength: 255},
+            {name: 'slug', type: 'string', required: true, label: 'Slug', unique: true, maxLength: 255},
+            {name: 'description', type: 'text', label: 'Description'},
+            {name: 'featured_image', type: 'image', label: 'Image', maxLength: 2000},
+            {name: 'price', type: 'number', format: 'currency', required: true, label: 'Price', min: 0},
+            {name: 'sale_price', type: 'number', format: 'currency', label: 'Sale Price', min: 0, nullable: true},
+            {
+                name: 'has_discount',
+                type: 'boolean',
+                label: 'Enable Discount',
+                default: false
+            },
+            {
+                name: 'discount_percent',
+                type: 'number',
+                label: 'Discount (%)',
+                min: 0,
+                max: 100,
+                conditional: {field: 'has_discount', value: true}
+            },
+            {
+                name: 'category_id',
+                type: 'relation',
+                relation: 'categories',
+                label: 'Category',
+                required: true,
+                displayField: 'name',
+                foreignKey: true
+            },
+            {
+                name: 'tag_ids',
+                type: 'json',
+                label: 'Tags',
+                multiple: true,
+                relation: 'tags',
+                displayField: 'name',
+                default: []
+            },
+            {
+                name: 'stock_status',
+                type: 'select',
+                label: 'Stock Status',
+                options: [
+                    {value: 'in_stock', label: 'In Stock', color: 'green'},
+                    {value: 'out_of_stock', label: 'Out of Stock', color: 'red'},
+                    {value: 'pre_order', label: 'Pre-Order', color: 'blue'}
+                ],
+                default: 'in_stock'
+            },
+            {name: 'stock_quantity', type: 'number', label: 'Stock Quantity', min: 0, default: 0},
+            {name: 'is_featured', type: 'boolean', label: 'Featured', default: false},
+            {name: 'is_active', type: 'boolean', label: 'Active', default: true},
+            {name: 'created_at', type: 'datetime', hidden: true, auto: true},
+            {name: 'updated_at', type: 'datetime', hidden: true, auto: true}
+        ],
+        actions: ['create', 'read', 'update', 'delete'],
+        listView: {
+            columns: ['name', 'category_id', 'price', 'stock_quantity', 'stock_status', 'is_active'],
+            searchable: ['name', 'slug', 'description'],
+            sortable: ['name', 'price', 'stock_quantity', 'created_at'],
+            defaultSort: {field: 'created_at', order: 'desc'},
+            filters: ['category_id', 'stock_status', 'is_active']
+        },
+        formView: {
+            sections: [
+                {
+                    title: 'Basic Information',
+                    fields: ['name', 'slug', 'category_id', 'description', 'featured_image']
+                },
+                {
+                    title: 'Pricing',
+                    fields: ['price', 'sale_price', 'has_discount', 'discount_percent']
+                },
+                {
+                    title: 'Inventory',
+                    fields: ['stock_status', 'stock_quantity']
+                },
+                {
+                    title: 'Organization',
+                    fields: ['tag_ids', 'is_featured', 'is_active']
+                }
+            ]
+        }
+    }
+};
+
+module.exports = {
+    modelSchemas
+};
+```
+
+## Custom UI Admin
+
+For complex interfaces beyond CRUD operations, create custom React components.
+
+<Warning>
+  **Important Constraints**:
+  - Relative imports are NOT supported - write all code in a single file
+  - Only two components are supported: `Listing.tsx` and `CreateOrEdit.tsx`
+  - Only Ant Design components and Ant Design icons are available
+  - Use injected `window.axiosReq` for API calls
+  - Components are served via API and rendered dynamically by Faster backend
+</Warning>
+
+### Directory Structure
+
+```bash
+your-plugin/
+├── admin/
+│   └── items/
+│       ├── Listing.tsx        # List view (required)
+│       └── CreateOrEdit.tsx   # Create/Edit form (required)
+└── index.js
+```
+
+### Available Imports
+
+Only these imports are supported:
+
+```typescript
+// Ant Design components
+import { Table, Button, Space, Tag, Image, Popconfirm, Modal, Input, Select, DatePicker, Form, message } from 'antd';
+
+// Ant Design icons
+import { EditOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+
+// React (already available globally)
+import React from 'react';
+```
+
+### Listing Component
+
+The `Listing.tsx` component displays a table of records with actions.
+
+```typescript admin/items/Listing.tsx
+import React from 'react';
+import { Table, Button, Space, Tag, Image, Popconfirm } from 'antd';
+import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+
+// All types must be defined in the same file
+interface ListingProps {
+  pluginId: string;
+  data: Array<Record<string, any>>;
+  loading?: boolean;
+  onRefresh: () => void;
+  onCreate: () => void;
+  onEdit: (record: Record<string, any>) => void;
+  onDelete: (record: Record<string, any>) => void;
+  pagination?: {
+    current: number;
+    pageSize: number;
+    total: number;
+  };
+  onPaginationChange?: (page: number, pageSize: number) => void;
+}
+
+const Listing: React.FC<ListingProps> = ({
+  data,
+  loading,
+  onRefresh,
+  onCreate,
+  onEdit,
+  onDelete,
+  pagination,
+  onPaginationChange,
+}) => {
+  const columns = [
+    {
+      title: 'Image',
+      dataIndex: 'featured_image',
+      key: 'featured_image',
+      width: 80,
+      render: (url: string) =>
+        url ? (
+          <Image
+            src={url}
+            alt="Item"
+            width={50}
+            height={50}
+            className="tw-rounded"
+          />
+        ) : (
+          <div className="tw-w-12 tw-h-12 tw-bg-gray-200 tw-rounded tw-flex tw-items-center tw-justify-center">
+            📦
+          </div>
+        ),
+    },
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      sorter: true,
+      render: (text: string, record: any) => (
+        <div>
+          <div className="tw-font-medium">{text}</div>
+          {record.sku && <div className="tw-text-xs tw-text-gray-500">{record.sku}</div>}
+        </div>
+      ),
+    },
+    {
+      title: 'Price',
+      dataIndex: 'price',
+      key: 'price',
+      width: 120,
+      sorter: true,
+      render: (price: number) => `$${price?.toFixed(2)}`,
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      width: 100,
+      render: (_: any, record: any) => (
+        <Tag color={record.is_active ? 'green' : 'default'}>
+          {record.is_active ? 'Active' : 'Inactive'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 120,
+      fixed: 'right',
+      render: (_: any, record: any) => (
+        <Space>
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            onClick={() => onEdit(record)}
+            size="small"
+          >
+            Edit
+          </Button>
+          <Popconfirm
+            title="Delete item"
+            description="Are you sure?"
+            onConfirm={() => onDelete(record)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button
+              type="link"
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+            >
+              Delete
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <div className="tw-mb-4 tw-flex tw-justify-between tw-items-center">
+        <h3 className="tw-text-lg tw-font-semibold tw-m-0">Items</h3>
+        <Space>
+          <Button onClick={onRefresh}>Refresh</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={onCreate}>
+            Add Item
+          </Button>
+        </Space>
+      </div>
+
+      <Table
+        columns={columns}
+        dataSource={data}
+        loading={loading}
+        rowKey="id"
+        pagination={
+          pagination
+            ? {
+                current: pagination.current,
+                pageSize: pagination.pageSize,
+                total: pagination.total,
+                showSizeChanger: true,
+                showTotal: (total) => `Total ${total} items`,
+                onChange: onPaginationChange,
+              }
+            : false
+        }
+        scroll={{ x: 'max-content' }}
+      />
+    </div>
+  );
+};
+
+export default Listing;
+```
+
+### CreateOrEdit Component
+
+The `CreateOrEdit.tsx` component handles both creating new records and editing existing ones.
+
+```typescript admin/items/CreateOrEdit.tsx
+import React, { useEffect } from 'react';
+import { Form, Input, InputNumber, Switch, Button, Space, message } from 'antd';
+
+// All types must be defined in the same file
+interface CreateOrEditProps {
+  pluginId: string;
+  mode: 'create' | 'edit';
+  initialValues?: Record<string, any>;
+  onSubmit: (values: Record<string, any>) => Promise<void>;
+  onCancel: () => void;
+  loading?: boolean;
+}
+
+const CreateOrEdit: React.FC<CreateOrEditProps> = ({
+  pluginId,
+  mode,
+  initialValues,
+  onSubmit,
+  onCancel,
+  loading,
+}) => {
+  const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (initialValues) {
+      form.setFieldsValue(initialValues);
+    }
+  }, [initialValues, form]);
+
+  const handleSubmit = async (values: any) => {
+    try {
+      await onSubmit(values);
+      message.success(`Item ${mode === 'create' ? 'created' : 'updated'} successfully`);
+      form.resetFields();
+    } catch (error) {
+      message.error(`Failed to ${mode} item`);
+      console.error(error);
+    }
+  };
+
+  return (
+    <div className="tw-bg-white tw-p-6 tw-rounded-lg">
+      <h2 className="tw-text-xl tw-font-semibold tw-mb-6">
+        {mode === 'create' ? 'Create Item' : 'Edit Item'}
+      </h2>
+
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleSubmit}
+        initialValues={initialValues}
+      >
+        <Form.Item
+          name="name"
+          label="Item Name"
+          rules={[{ required: true, message: 'Please enter item name' }]}
+        >
+          <Input placeholder="Enter item name" />
+        </Form.Item>
+
+        <Form.Item
+          name="description"
+          label="Description"
+        >
+          <Input.TextArea rows={4} placeholder="Enter description" />
+        </Form.Item>
+
+        <Form.Item
+          name="price"
+          label="Price"
+          rules={[{ required: true, message: 'Please enter price' }]}
+        >
+          <InputNumber
+            min={0}
+            step={0.01}
+            prefix="$"
+            placeholder="0.00"
+            className="tw-w-full"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="is_active"
+          label="Active"
+          valuePropName="checked"
+        >
+          <Switch />
+        </Form.Item>
+
+        <Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={loading}>
+              {mode === 'create' ? 'Create' : 'Update'}
+            </Button>
+            <Button onClick={onCancel}>
+              Cancel
+            </Button>
+          </Space>
+        </Form.Item>
+      </Form>
+    </div>
+  );
+};
+
+export default CreateOrEdit;
+```
+
+### Available UI Components
+
+When building custom admin UI, you have access to Ant Design components:
+
+<AccordionGroup>
+  <Accordion title="Data Display" icon="table">
+    - **Table** - Data tables with sorting, filtering, pagination
+    - **List** - Simple lists
+    - **Card** - Content containers
+    - **Descriptions** - Key-value pairs
+    - **Tag** - Status tags with colors
+    - **Image** - Image display with preview
+    - **Statistic** - Statistical numbers
+  </Accordion>
+
+  <Accordion title="Form Components" icon="pen">
+    - **Input** - Text input fields
+    - **Select** - Dropdown selections
+    - **DatePicker** - Date selection
+    - **TimePicker** - Time selection
+    - **Checkbox** - Checkboxes
+    - **Radio** - Radio buttons
+    - **Switch** - Toggle switches
+    - **Upload** - File uploads
+  </Accordion>
+
+  <Accordion title="Feedback" icon="bell">
+    - **Modal** - Dialog modals
+    - **Message** - Global messages
+    - **Notification** - Notification boxes
+    - **Popconfirm** - Confirmation popups
+    - **Spin** - Loading spinners
+    - **Progress** - Progress bars
+  </Accordion>
+
+  <Accordion title="Navigation" icon="compass">
+    - **Button** - Action buttons
+    - **Dropdown** - Dropdown menus
+    - **Tabs** - Tab navigation
+    - **Breadcrumb** - Navigation breadcrumbs
+    - **Space** - Item spacing
+  </Accordion>
+</AccordionGroup>
+
+## API Access in Custom UI
+
+Faster CMS injects `axiosReq` globally for making API calls. Access your plugin's backend endpoints using this function.
+
+### Using axiosReq
+
+```typescript
+// axiosReq is injected by Faster and available globally
+// @ts-ignore
+const axiosReq = window.axiosReq;
+
+// GET request - Fetch all items
+const response = await axiosReq(
+  'GET',
+  `studio/cms/plugins/${pluginId}/admin/data/items`
+);
+const items = response.data;
+
+// POST request - Create new item
+await axiosReq(
+  'POST',
+  `studio/cms/plugins/${pluginId}/admin/data/items`,
+  {
+    name: 'New Item',
+    price: 99.99,
+    is_active: true
+  }
+);
+
+// PUT request - Update existing item
+await axiosReq(
+  'PUT',
+  `studio/cms/plugins/${pluginId}/admin/data/items/${itemId}`,
+  {
+    name: 'Updated Name',
+    price: 149.99
+  }
+);
+
+// DELETE request - Delete item
+await axiosReq(
+  'DELETE',
+  `studio/cms/plugins/${pluginId}/admin/data/items/${itemId}`
+);
+```
+
+### API Call Pattern
+
+All API calls should be wrapped in try-catch blocks:
+
+```typescript
+const handleDelete = async (record: any) => {
+  try {
+    // @ts-ignore
+    const axiosReq = window.axiosReq;
+
+    await axiosReq(
+      'DELETE',
+      `studio/cms/plugins/${pluginId}/admin/data/items/${record.id}`
+    );
+
+    message.success('Item deleted successfully');
+    onRefresh(); // Refresh the list
+  } catch (error) {
+    console.error('Delete failed:', error);
+    message.error('Failed to delete item');
+  }
+};
+```
+
+## Styling Custom UI
+
+Use Tailwind CSS with the `tw-` prefix:
+
+```typescript
+<div className="tw-bg-white tw-border tw-border-gray-200 tw-rounded-lg tw-p-6">
+  <h3 className="tw-text-xl tw-font-semibold tw-text-gray-900 tw-mb-4">
+    Title
+  </h3>
+  <p className="tw-text-gray-600">Content</p>
+  <button className="tw-px-4 tw-py-2 tw-bg-blue-600 tw-text-white tw-rounded-lg hover:tw-bg-blue-700">
+    Action
+  </button>
+</div>
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose the Right Approach" icon="compass">
+    - Use **Schema-Based** for standard CRUD operations
+    - Use **Custom UI** for complex workflows, custom visualizations, or unique interactions
+    - Combine both approaches in the same plugin
+    - Schema-based is faster to develop and maintain
+  </Accordion>
+
+  <Accordion title="Schema Design" icon="database">
+    - Keep field names consistent with database columns
+    - Use descriptive labels and help text
+    - Group related fields in form sections
+    - Add conditional fields to reduce clutter
+    - Use appropriate field types and validations
+  </Accordion>
+
+  <Accordion title="Custom UI Constraints" icon="code">
+    - **No relative imports** - all code must be in a single file
+    - Only use Ant Design components and Ant Design icons
+    - Only two components supported: `Listing.tsx` and `CreateOrEdit.tsx`
+    - Define all types inline in the same file
+    - Use injected `window.axiosReq` for API calls
+    - Components are rendered dynamically by Faster backend
+  </Accordion>
+
+  <Accordion title="Custom UI Performance" icon="bolt">
+    - Implement pagination for large datasets
+    - Use loading states for async operations
+    - Debounce search inputs when needed
+    - Keep component code minimal and focused
+    - Avoid complex computations in render
+  </Accordion>
+
+  <Accordion title="User Experience" icon="user">
+    - Provide clear feedback on actions using `message` from Ant Design
+    - Use confirmation dialogs for destructive actions (`Popconfirm`)
+    - Show loading states during operations
+    - Display meaningful error messages
+    - Implement search and filtering
+  </Accordion>
+
+  <Accordion title="Error Handling" icon="triangle-exclamation">
+    - Always wrap API calls in try-catch blocks
+    - Display user-friendly error messages with `message.error()`
+    - Log errors to console for debugging
+    - Provide clear feedback when operations fail
+    - Validate data before submission
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Controllers" icon="code" href="/building/controllers">
+    Build API endpoints for admin
+  </Card>
+  <Card title="Models" icon="database" href="/core-concepts/models">
+    Define database models
+  </Card>
+  <Card title="Routing" icon="route" href="/core-concepts/routing-system">
+    Configure admin routes
+  </Card>
+  <Card title="Views" icon="window" href="/building/views">
+    Create frontend views
+  </Card>
+</CardGroup>

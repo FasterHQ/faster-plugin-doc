@@ -1,0 +1,1017 @@
+---
+title: 'Controllers'
+description: 'Handle HTTP requests and responses in your plugin'
+---
+
+## Overview
+
+Controllers are responsible for handling HTTP requests, processing business logic via services, and returning appropriate responses. They act as the bridge between routes and your application logic.
+
+<Info>
+  Controllers receive requests from routes, interact with services and models, and return JSON or HTML responses.
+</Info>
+
+## Controller Structure
+
+Controllers are organized in your plugin's `controllers/` directory:
+
+```bash
+your-plugin/
+├── controllers/
+│   ├── frontend.js       # HTML/View controllers
+│   ├── api/
+│   │   └── items.js     # API controllers
+│   ├── data-management.js # Generic CRUD operations
+│   └── settings.js       # Plugin settings controller
+└── routes.js
+```
+
+## Controller Types
+
+### Frontend Controllers
+
+Frontend controllers render HTML pages using the rendering service:
+
+```javascript controllers/frontend.js
+const renderer = require('../../../../core/frontend/services/rendering');
+const logging = require('@tryghost/logging');
+const {Item} = require('../models');
+
+/**
+ * List items page
+ */
+async function listItems(req, res) {
+    res.routerOptions = {
+        type: 'custom',
+        templates: ['my-plugin/items'],
+        defaultTemplate: 'my-plugin/items',
+        context: ['page'],
+        resourceType: 'pages'
+    };
+
+    try {
+        const items = await Item.findAll({
+            filter: 'is_active:true'
+        });
+
+        const data = {
+            title: 'Items',
+            page: {
+                title: 'Items',
+                slug: 'my-plugin/items',
+                url: '/my-plugin/items'
+            },
+            items: items ? items.toJSON() : []
+        };
+
+        return renderer.renderer(req, res, data);
+    } catch (error) {
+        logging.error('Error fetching items:', error);
+
+        const data = {
+            title: 'Items',
+            page: {
+                title: 'Items',
+                slug: 'my-plugin/items',
+                url: '/my-plugin/items'
+            },
+            items: [],
+            error: 'Failed to load items'
+        };
+
+        return renderer.renderer(req, res, data);
+    }
+}
+
+/**
+ * Item detail page
+ */
+async function itemDetail(req, res) {
+    res.routerOptions = {
+        type: 'custom',
+        templates: ['my-plugin/item-detail'],
+        defaultTemplate: 'my-plugin/item-detail',
+        context: ['page'],
+        resourceType: 'pages'
+    };
+
+    try {
+        const {slug} = req.params;
+
+        const item = await Item.findOne({
+            slug: slug,
+            is_active: true
+        }, {
+            withRelated: ['category', 'tags']
+        });
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item not found'
+            });
+        }
+
+        const data = {
+            title: item.get('name'),
+            page: {
+                title: item.get('name'),
+                slug: 'my-plugin/items',
+                url: `/my-plugin/items/${slug}`
+            },
+            item: item.toJSON()
+        };
+
+        return renderer.renderer(req, res, data);
+    } catch (error) {
+        logging.error('Error fetching item:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch item'
+        });
+    }
+}
+
+module.exports = {
+    listItems,
+    itemDetail
+};
+```
+
+<Note>
+  Frontend controllers use the `renderer.renderer()` function to render Handlebars templates.
+</Note>
+
+### API Controllers
+
+API controllers return JSON responses:
+
+```javascript controllers/api/items.js
+const logging = require('@tryghost/logging');
+const {Item} = require('../../models');
+
+/**
+ * Get all items
+ */
+async function getItems(req, res) {
+    try {
+        const {page = 1, limit = 20, status} = req.query;
+
+        let filter = 'is_active:true';
+        if (status) {
+            filter += `+status:${status}`;
+        }
+
+        const result = await Item.findPage({
+            page: parseInt(page),
+            limit: parseInt(limit),
+            filter: filter
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: result.data,
+            meta: result.meta
+        });
+    } catch (error) {
+        logging.error('Error fetching items:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to fetch items'
+        });
+    }
+}
+
+/**
+ * Get single item
+ */
+async function getItem(req, res) {
+    try {
+        const {id} = req.params;
+
+        const item = await Item.findOne({id}, {
+            withRelated: ['category', 'tags']
+        });
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item not found'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: item.toJSON()
+        });
+    } catch (error) {
+        logging.error('Error fetching item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to fetch item'
+        });
+    }
+}
+
+/**
+ * Create item
+ */
+async function createItem(req, res) {
+    try {
+        const {name, slug, description, is_active} = req.body;
+
+        // Validation
+        if (!name || !slug) {
+            return res.status(400).json({
+                success: false,
+                error: 'Name and slug are required'
+            });
+        }
+
+        // Create item
+        const item = await Item.add({
+            name,
+            slug,
+            description,
+            is_active: is_active !== undefined ? is_active : true
+        });
+
+        return res.status(201).json({
+            success: true,
+            data: item.toJSON()
+        });
+    } catch (error) {
+        logging.error('Error creating item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to create item'
+        });
+    }
+}
+
+/**
+ * Update item
+ */
+async function updateItem(req, res) {
+    try {
+        const {id} = req.params;
+        const {name, description, is_active, status} = req.body;
+
+        const item = await Item.edit({
+            name,
+            description,
+            is_active,
+            status
+        }, {
+            id: id,
+            require: true
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: item.toJSON()
+        });
+    } catch (error) {
+        if (error.message.includes('not found')) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item not found'
+            });
+        }
+
+        logging.error('Error updating item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to update item'
+        });
+    }
+}
+
+/**
+ * Delete item
+ */
+async function deleteItem(req, res) {
+    try {
+        const {id} = req.params;
+
+        await Item.destroy({
+            id: id,
+            require: true
+        });
+
+        return res.status(204).send();
+    } catch (error) {
+        if (error.message.includes('not found')) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item not found'
+            });
+        }
+
+        logging.error('Error deleting item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to delete item'
+        });
+    }
+}
+
+module.exports = {
+    getItems,
+    getItem,
+    createItem,
+    updateItem,
+    deleteItem
+};
+```
+
+### Data Management Controller
+
+Generic controller for CRUD operations across multiple models:
+
+```javascript controllers/data-management.js
+const {modelSchemas} = require('../schema/admin-schema.js');
+const logging = require('@tryghost/logging');
+const serviceFactory = require('../services/factory.js');
+
+const listRecords = async (req, res) => {
+    const {model} = req.params;
+    const {page = 1, limit = 10, search, sort = 'created_at', order = 'desc'} = req.query;
+
+    try {
+        const schema = modelSchemas[model];
+        if (!schema) {
+            return res.status(404).json({error: `Model ${model} not found`});
+        }
+
+        const service = serviceFactory.make(model);
+        const result = await service.list({page, limit, search, sort, order});
+
+        const data = result[model] || result.data || result;
+        const meta = result.meta || {
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                pages: 1,
+                total: Array.isArray(data) ? data.length : 0
+            }
+        };
+
+        return res.json({
+            data: data,
+            meta: meta
+        });
+    } catch (error) {
+        logging.error(`Error listing ${model}:`, error);
+        res.status(500).json({error: `Failed to list ${model}`});
+    }
+};
+
+const getRecord = async (req, res) => {
+    const {model, id} = req.params;
+
+    try {
+        const schema = modelSchemas[model];
+        if (!schema) {
+            return res.status(404).json({error: `Model ${model} not found`});
+        }
+
+        const service = serviceFactory.make(model);
+        const record = await service.getById(id);
+        return res.json({[model]: record});
+    } catch (error) {
+        if (error.statusCode === 404) {
+            return res.status(404).json({error: `${model} not found`});
+        }
+        logging.error(`Error fetching ${model}:`, error);
+        res.status(500).json({error: `Failed to fetch ${model}`});
+    }
+};
+
+const createRecord = async (req, res) => {
+    const {model} = req.params;
+
+    try {
+        const schema = modelSchemas[model];
+        if (!schema) {
+            return res.status(404).json({error: `Model ${model} not found`});
+        }
+
+        const service = serviceFactory.make(model);
+        const record = await service.create(req.body);
+        return res.status(201).json({[model]: record});
+    } catch (error) {
+        if (error.statusCode === 400) {
+            return res.status(400).json({error: error.message});
+        }
+        logging.error(`Error creating ${model}:`, error);
+        res.status(500).json({error: `Failed to create ${model}`});
+    }
+};
+
+const updateRecord = async (req, res) => {
+    const {model, id} = req.params;
+
+    try {
+        const schema = modelSchemas[model];
+        if (!schema) {
+            return res.status(404).json({error: `Model ${model} not found`});
+        }
+
+        const service = serviceFactory.make(model);
+        const record = await service.update(id, req.body);
+        return res.json({[model]: record});
+    } catch (error) {
+        if (error.statusCode === 404) {
+            return res.status(404).json({error: `${model} not found`});
+        }
+        if (error.statusCode === 400) {
+            return res.status(400).json({error: error.message});
+        }
+        logging.error(`Error updating ${model}:`, error);
+        res.status(500).json({error: `Failed to update ${model}`});
+    }
+};
+
+const deleteRecord = async (req, res) => {
+    const {model, id} = req.params;
+
+    try {
+        const schema = modelSchemas[model];
+        if (!schema) {
+            return res.status(404).json({error: `Model ${model} not found`});
+        }
+
+        const service = serviceFactory.make(model);
+        await service.delete(id);
+        return res.status(204).send();
+    } catch (error) {
+        if (error.statusCode === 404) {
+            return res.status(404).json({error: `${model} not found`});
+        }
+        logging.error(`Error deleting ${model}:`, error);
+        res.status(500).json({error: `Failed to delete ${model}`});
+    }
+};
+
+module.exports = {
+    listRecords,
+    getRecord,
+    createRecord,
+    updateRecord,
+    deleteRecord
+};
+```
+
+### Settings Controller
+
+Controller for managing plugin settings:
+
+```javascript controllers/settings.js
+const logging = require('@tryghost/logging');
+
+class SettingsController {
+    constructor() {
+        this.get = this.get.bind(this);
+        this.update = this.update.bind(this);
+    }
+
+    getPlugin() {
+        return require('../index');
+    }
+
+    async get(req, res) {
+        try {
+            const plugin = this.getPlugin();
+            const settings = plugin.getSettings();
+            res.json(settings);
+        } catch (err) {
+            logging.error('Error fetching settings:', err);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch settings'
+            });
+        }
+    }
+
+    async update(req, res) {
+        try {
+            const plugin = this.getPlugin();
+            const newSettings = req.body;
+
+            const updatedSettings = await plugin.updateSettings(newSettings);
+            res.json(updatedSettings);
+        } catch (err) {
+            logging.error('Error updating settings:', err);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update settings'
+            });
+        }
+    }
+}
+
+module.exports = new SettingsController();
+```
+
+## Controller Patterns
+
+### Request Handling
+
+Access request data from the `req` object:
+
+```javascript
+async function myController(req, res) {
+    // Route parameters
+    const {id, slug} = req.params;
+
+    // Query parameters
+    const {page, limit, status} = req.query;
+
+    // Request body
+    const {name, description} = req.body;
+
+    // Member info (if authenticated)
+    const member = req.member;
+
+    // Headers
+    const contentType = req.headers['content-type'];
+
+    // Cookies
+    const sessionId = req.cookies.session_id;
+}
+```
+
+### Response Methods
+
+<CodeGroup>
+```javascript JSON Response
+res.json({
+    success: true,
+    data: items
+});
+```
+
+```javascript Status Code
+res.status(201).json({
+    success: true,
+    data: newItem
+});
+```
+
+```javascript No Content
+res.status(204).send();
+```
+
+```javascript Redirect
+res.redirect('/my-plugin/items');
+```
+
+```javascript HTML Response
+res.send('<h1>Hello</h1>');
+```
+
+```javascript Render Template
+renderer.renderer(req, res, data);
+```
+</CodeGroup>
+
+### Error Handling
+
+Always wrap async operations in try-catch:
+
+```javascript
+async function myController(req, res) {
+    try {
+        // Your logic here
+        const item = await Item.findOne({id: req.params.id});
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item not found'
+            });
+        }
+
+        return res.json({
+            success: true,
+            data: item.toJSON()
+        });
+    } catch (error) {
+        logging.error('Error in myController:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+}
+```
+
+### Validation
+
+Validate input before processing:
+
+```javascript
+async function createItem(req, res) {
+    try {
+        const {name, slug, email} = req.body;
+
+        // Required fields
+        if (!name || !slug) {
+            return res.status(400).json({
+                success: false,
+                error: 'Name and slug are required'
+            });
+        }
+
+        // Field length
+        if (name.length < 3 || name.length > 191) {
+            return res.status(400).json({
+                success: false,
+                error: 'Name must be between 3 and 191 characters'
+            });
+        }
+
+        // Email format
+        if (email && !isValidEmail(email)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid email format'
+            });
+        }
+
+        // Create item
+        const item = await Item.add({name, slug, email});
+
+        return res.status(201).json({
+            success: true,
+            data: item.toJSON()
+        });
+    } catch (error) {
+        logging.error('Error creating item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to create item'
+        });
+    }
+}
+```
+
+## HTTP Status Codes
+
+Use appropriate status codes:
+
+| Code | Meaning | Use Case |
+|------|---------|----------|
+| **200** | OK | Successful GET, PUT, PATCH |
+| **201** | Created | Successful POST (resource created) |
+| **204** | No Content | Successful DELETE |
+| **400** | Bad Request | Validation errors, invalid input |
+| **401** | Unauthorized | Authentication required |
+| **403** | Forbidden | Authenticated but no permission |
+| **404** | Not Found | Resource doesn't exist |
+| **500** | Internal Server Error | Unexpected server errors |
+
+## Working with Services
+
+Delegate business logic to services:
+
+```javascript
+const itemService = require('../services/item-service');
+
+async function createItem(req, res) {
+    try {
+        const itemData = req.body;
+
+        // Service handles business logic
+        const item = await itemService.create(itemData);
+
+        return res.status(201).json({
+            success: true,
+            data: item
+        });
+    } catch (error) {
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                success: false,
+                error: error.message
+            });
+        }
+
+        logging.error('Error creating item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to create item'
+        });
+    }
+}
+```
+
+## Pagination
+
+Handle paginated requests:
+
+```javascript
+async function listItems(req, res) {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+
+        const result = await Item.findPage({
+            page: page,
+            limit: limit,
+            filter: 'is_active:true',
+            order: 'created_at DESC'
+        });
+
+        return res.json({
+            success: true,
+            data: result.data,
+            meta: {
+                pagination: {
+                    page: result.meta.pagination.page,
+                    limit: result.meta.pagination.limit,
+                    pages: result.meta.pagination.pages,
+                    total: result.meta.pagination.total
+                }
+            }
+        });
+    } catch (error) {
+        logging.error('Error listing items:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to list items'
+        });
+    }
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep Controllers Thin" icon="minimize">
+    - Controllers should only handle HTTP concerns
+    - Delegate business logic to services
+    - Keep controller methods focused and simple
+    - One controller method per route
+  </Accordion>
+
+  <Accordion title="Always Handle Errors" icon="shield">
+    - Wrap async operations in try-catch
+    - Return appropriate status codes
+    - Log errors for debugging
+    - Provide meaningful error messages to clients
+  </Accordion>
+
+  <Accordion title="Validate Input" icon="check">
+    - Validate all user input
+    - Check required fields
+    - Validate data types and formats
+    - Return 400 status for validation errors
+  </Accordion>
+
+  <Accordion title="Use Proper Status Codes" icon="hashtag">
+    - 200 for successful reads
+    - 201 for successful creates
+    - 204 for successful deletes
+    - 400 for validation errors
+    - 404 for not found
+    - 500 for server errors
+  </Accordion>
+
+  <Accordion title="Document Your Controllers" icon="file-lines">
+    - Add JSDoc comments
+    - Describe what the controller does
+    - Document parameters and return values
+    - Include usage examples
+  </Accordion>
+
+  <Accordion title="Use Logging" icon="terminal">
+    - Log errors with context
+    - Use appropriate log levels
+    - Don't log sensitive data
+    - Use `@tryghost/logging` module
+  </Accordion>
+</AccordionGroup>
+
+## Complete Example
+
+Here's a complete controller with all patterns:
+
+```javascript controllers/api/items.js
+const logging = require('@tryghost/logging');
+const {Item} = require('../../models');
+const itemService = require('../../services/item-service');
+
+/**
+ * @description Get paginated list of items
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Promise}
+ */
+async function listItems(req, res) {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const status = req.query.status;
+        const search = req.query.search;
+
+        const result = await itemService.list({
+            page,
+            limit,
+            status,
+            search
+        });
+
+        return res.json({
+            success: true,
+            data: result.data,
+            meta: result.meta
+        });
+    } catch (error) {
+        logging.error('Error listing items:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to list items'
+        });
+    }
+}
+
+/**
+ * @description Get single item by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Promise}
+ */
+async function getItem(req, res) {
+    try {
+        const {id} = req.params;
+
+        const item = await itemService.getById(id);
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item not found'
+            });
+        }
+
+        return res.json({
+            success: true,
+            data: item
+        });
+    } catch (error) {
+        logging.error('Error fetching item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to fetch item'
+        });
+    }
+}
+
+/**
+ * @description Create new item
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Promise}
+ */
+async function createItem(req, res) {
+    try {
+        const {name, slug, description} = req.body;
+
+        // Validation
+        if (!name || !slug) {
+            return res.status(400).json({
+                success: false,
+                error: 'Name and slug are required'
+            });
+        }
+
+        if (name.length < 3 || name.length > 191) {
+            return res.status(400).json({
+                success: false,
+                error: 'Name must be between 3 and 191 characters'
+            });
+        }
+
+        // Create via service
+        const item = await itemService.create({
+            name,
+            slug,
+            description
+        });
+
+        return res.status(201).json({
+            success: true,
+            data: item
+        });
+    } catch (error) {
+        if (error.statusCode === 400) {
+            return res.status(400).json({
+                success: false,
+                error: error.message
+            });
+        }
+
+        logging.error('Error creating item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to create item'
+        });
+    }
+}
+
+/**
+ * @description Update existing item
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Promise}
+ */
+async function updateItem(req, res) {
+    try {
+        const {id} = req.params;
+        const updates = req.body;
+
+        const item = await itemService.update(id, updates);
+
+        return res.json({
+            success: true,
+            data: item
+        });
+    } catch (error) {
+        if (error.statusCode === 404) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item not found'
+            });
+        }
+
+        if (error.statusCode === 400) {
+            return res.status(400).json({
+                success: false,
+                error: error.message
+            });
+        }
+
+        logging.error('Error updating item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to update item'
+        });
+    }
+}
+
+/**
+ * @description Delete item
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Promise}
+ */
+async function deleteItem(req, res) {
+    try {
+        const {id} = req.params;
+
+        await itemService.delete(id);
+
+        return res.status(204).send();
+    } catch (error) {
+        if (error.statusCode === 404) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item not found'
+            });
+        }
+
+        logging.error('Error deleting item:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to delete item'
+        });
+    }
+}
+
+module.exports = {
+    listItems,
+    getItem,
+    createItem,
+    updateItem,
+    deleteItem
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Routing System" icon="route" href="/core-concepts/routing-system">
+    Connect controllers to routes
+  </Card>
+  <Card title="Services" icon="gears" href="/building/services">
+    Create services for business logic
+  </Card>
+  <Card title="Models" icon="database" href="/core-concepts/models">
+    Work with database models
+  </Card>
+  <Card title="Views" icon="window" href="/building/views">
+    Render HTML templates
+  </Card>
+</CardGroup>

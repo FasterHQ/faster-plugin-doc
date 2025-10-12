@@ -1,0 +1,29 @@
+# Mintlify files
+.mintlify
+
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,685 @@
+---
+title: 'Migrations'
+description: 'Create and manage database migrations for your plugin'
+---
+
+## Overview
+
+Migrations are version control for your database schema. They allow you to define and share the database schema changes needed by your plugin in a consistent, reproducible way.
+
+<Info>
+  Faster CMS automatically runs migrations when your plugin is activated or updated.
+</Info>
+
+## Migration File Structure
+
+Migrations live in your plugin's `migrations/` directory:
+
+```bash
+your-plugin/
+├── migrations/
+│   ├── 01-create-items-table.js
+│   ├── 02-create-categories-table.js
+│   ├── 03-create-item-category-table.js
+│   └── 04-add-status-to-items.js
+└── models/
+    └── schema.js
+```
+
+## Naming Convention
+
+<Warning>
+  Migration files **must** follow the naming convention: `NN-description.js`
+</Warning>
+
+### Naming Rules
+
+1. **Sequential numbering**: Start with `01-`, `02-`, `03-`, etc.
+2. **Zero-padded**: Always use two digits (`01` not `1`)
+3. **Descriptive name**: Use kebab-case to describe what the migration does
+4. **Action prefix**: Start with a verb (create, add, update, drop, alter)
+
+### Naming Examples
+
+<CodeGroup>
+```bash Create Table
+01-create-items-table.js
+02-create-categories-table.js
+03-create-item-tag-table.js
+```
+
+```bash Add Column
+04-add-status-to-items.js
+05-add-description-to-categories.js
+```
+
+```bash Update/Alter
+06-update-items-price-column.js
+07-alter-categories-slug-unique.js
+```
+
+```bash Drop/Remove
+08-drop-old-metadata-table.js
+09-remove-deprecated-column.js
+```
+</CodeGroup>
+
+## Basic Migration Structure
+
+Every migration file must export two functions: `up` and `down`.
+
+```javascript migrations/01-create-items-table.js
+let logging = require('@tryghost/logging');
+
+module.exports = {
+    config: {
+        transaction: true  // Run migration in a transaction
+    },
+
+    up: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.hasTable('mp_items').transacting(transaction)
+            .then(function (hasTable) {
+                if (hasTable) {
+                    logging.info('Table mp_items already exists, skipping');
+                    return;
+                }
+
+                logging.info('Creating table: mp_items');
+
+                return connection.schema.createTable('mp_items', function (table) {
+                    table.uuid('id').primary();
+                    table.string('name', 191).notNullable();
+                    table.string('slug', 191).notNullable().unique();
+                    table.text('description').nullable();
+                    table.boolean('is_active').defaultTo(true);
+                    table.dateTime('created_at').notNullable();
+                    table.dateTime('updated_at').nullable();
+
+                    table.index('slug');
+                }).transacting(transaction);
+            });
+    },
+
+    down: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.hasTable('mp_items').transacting(transaction)
+            .then(function (hasTable) {
+                if (!hasTable) {
+                    logging.info('Table mp_items does not exist, skipping');
+                    return;
+                }
+
+                logging.info('Dropping table: mp_items');
+
+                return connection.schema.dropTableIfExists('mp_items')
+                    .transacting(transaction);
+            });
+    }
+};
+```
+
+<Note>
+  The `up` function applies changes, while `down` reverses them. Always implement both to support rollbacks.
+</Note>
+
+## Migration Types
+
+### Creating Tables
+
+```javascript migrations/01-create-items-table.js
+let logging = require('@tryghost/logging');
+
+module.exports = {
+    config: {
+        transaction: true
+    },
+
+    up: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.hasTable('mp_items').transacting(transaction)
+            .then(function (hasTable) {
+                if (hasTable) {
+                    logging.info('Table mp_items already exists, skipping');
+                    return;
+                }
+
+                logging.info('Creating table: mp_items');
+
+                return connection.schema.createTable('mp_items', function (table) {
+                    // Primary key
+                    table.uuid('id').primary();
+
+                    // String fields
+                    table.string('name', 191).notNullable();
+                    table.string('slug', 191).notNullable().unique();
+
+                    // Text fields
+                    table.text('description').nullable();
+
+                    // Boolean fields
+                    table.boolean('is_active').defaultTo(true);
+                    table.boolean('is_featured').defaultTo(false);
+
+                    // Integer fields
+                    table.integer('sort_order').defaultTo(0);
+
+                    // Decimal fields
+                    table.decimal('price', 10, 2).nullable();
+
+                    // Enum fields
+                    table.enum('status', ['draft', 'published', 'archived']).defaultTo('draft');
+
+                    // Foreign keys
+                    table.uuid('category_id').nullable();
+
+                    // Timestamps
+                    table.dateTime('created_at').notNullable();
+                    table.dateTime('updated_at').nullable();
+                    table.dateTime('deleted_at').nullable();
+
+                    // Indexes
+                    table.index('slug');
+                    table.index('category_id');
+                    table.index(['status', 'is_active']);
+                }).transacting(transaction);
+            });
+    },
+
+    down: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.dropTableIfExists('mp_items')
+            .transacting(transaction);
+    }
+};
+```
+
+### Adding Columns
+
+```javascript migrations/04-add-status-to-items.js
+let logging = require('@tryghost/logging');
+
+module.exports = {
+    config: {
+        transaction: true
+    },
+
+    up: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.hasColumn('mp_items', 'status').transacting(transaction)
+            .then(function (hasColumn) {
+                if (hasColumn) {
+                    logging.info('Column mp_items.status already exists, skipping');
+                    return;
+                }
+
+                logging.info('Adding column status to mp_items');
+
+                return connection.schema.table('mp_items', function (table) {
+                    table.string('status', 50).after('slug').notNullable().defaultTo('draft');
+                }).transacting(transaction);
+            });
+    },
+
+    down: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.hasColumn('mp_items', 'status').transacting(transaction)
+            .then(function (hasColumn) {
+                if (!hasColumn) {
+                    logging.info('Column mp_items.status does not exist, skipping');
+                    return;
+                }
+
+                logging.info('Dropping column status from mp_items');
+
+                return connection.schema.table('mp_items', function (table) {
+                    table.dropColumn('status');
+                }).transacting(transaction);
+            });
+    }
+};
+```
+
+### Dropping Tables
+
+```javascript migrations/10-drop-old-table.js
+let logging = require('@tryghost/logging');
+
+module.exports = {
+    config: {
+        transaction: true
+    },
+
+    up: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.hasTable('mp_old_table').transacting(transaction)
+            .then(function (hasTable) {
+                if (hasTable) {
+                    logging.info('Dropping table: mp_old_table');
+                    return connection.schema.dropTable('mp_old_table').transacting(transaction);
+                } else {
+                    logging.info('Table mp_old_table does not exist, skipping');
+                }
+            });
+    },
+
+    down: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        // Recreate table if rolled back
+        return connection.schema.hasTable('mp_old_table').transacting(transaction)
+            .then(function (hasTable) {
+                if (!hasTable) {
+                    logging.info('Recreating table: mp_old_table');
+                    return connection.schema.createTable('mp_old_table', function (table) {
+                        table.uuid('id').primary();
+                        table.string('name', 191).notNullable();
+                        table.dateTime('created_at').notNullable();
+                    }).transacting(transaction);
+                } else {
+                    logging.info('Table mp_old_table already exists, skipping');
+                }
+            });
+    }
+};
+```
+
+### Altering Columns
+
+```javascript migrations/05-update-price-precision.js
+let logging = require('@tryghost/logging');
+
+module.exports = {
+    config: {
+        transaction: true
+    },
+
+    up: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        logging.info('Altering price column precision in mp_items');
+
+        return connection.schema.table('mp_items', function (table) {
+            table.decimal('price', 12, 4).alter();
+        }).transacting(transaction);
+    },
+
+    down: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        logging.info('Reverting price column precision in mp_items');
+
+        return connection.schema.table('mp_items', function (table) {
+            table.decimal('price', 10, 2).alter();
+        }).transacting(transaction);
+    }
+};
+```
+
+## Column Types
+
+Use Knex.js schema builder methods for defining columns:
+
+<CodeGroup>
+```javascript Strings
+table.string('name', 191)           // VARCHAR(191)
+table.text('description')            // TEXT
+table.text('content', 'longtext')   // LONGTEXT
+```
+
+```javascript Numbers
+table.integer('count')               // INTEGER
+table.bigInteger('timestamp')        // BIGINT
+table.decimal('price', 10, 2)       // DECIMAL(10,2)
+table.float('rating', 3, 1)         // FLOAT(3,1)
+```
+
+```javascript Boolean & Date
+table.boolean('is_active')           // BOOLEAN
+table.date('birth_date')             // DATE
+table.dateTime('created_at')         // DATETIME
+table.timestamp('updated_at')        // TIMESTAMP
+```
+
+```javascript Special
+table.uuid('id')                     // UUID
+table.json('metadata')               // JSON
+table.enum('status', ['a', 'b'])    // ENUM
+```
+</CodeGroup>
+
+## Column Modifiers
+
+Chain modifiers to configure columns:
+
+```javascript
+table.string('email', 191)
+    .notNullable()         // NOT NULL
+    .unique()              // UNIQUE constraint
+    .defaultTo('value')    // DEFAULT value
+    .unsigned()            // UNSIGNED (for integers)
+    .index()               // Create index
+    .primary()             // Primary key
+    .after('column_name')  // Position after column
+    .comment('Description');  // Add comment
+```
+
+## Indexes
+
+Create indexes for better query performance:
+
+<CodeGroup>
+```javascript Single Column Index
+table.index('slug');
+table.index('email');
+```
+
+```javascript Composite Index
+table.index(['status', 'created_at']);
+table.index(['category_id', 'is_active']);
+```
+
+```javascript Unique Index
+table.unique('email');
+table.unique(['slug', 'status']);
+```
+</CodeGroup>
+
+## Foreign Keys
+
+Define relationships between tables:
+
+```javascript migrations/03-create-item-category-table.js
+let logging = require('@tryghost/logging');
+
+module.exports = {
+    config: {
+        transaction: true
+    },
+
+    up: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.hasTable('mp_item_category').transacting(transaction)
+            .then(function (hasTable) {
+                if (hasTable) {
+                    logging.info('Table mp_item_category already exists, skipping');
+                    return;
+                }
+
+                logging.info('Creating table: mp_item_category');
+
+                return connection.schema.createTable('mp_item_category', function (table) {
+                    table.uuid('id').primary();
+
+                    // Foreign key to items table
+                    table.uuid('item_id').notNullable();
+
+                    // Foreign key to categories table
+                    table.uuid('category_id').notNullable();
+
+                    table.integer('sort_order').defaultTo(0);
+
+                    // Indexes for foreign keys
+                    table.index('item_id');
+                    table.index('category_id');
+                    table.index(['item_id', 'category_id']);
+                }).transacting(transaction);
+            });
+    },
+
+    down: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.dropTableIfExists('mp_item_category')
+            .transacting(transaction);
+    }
+};
+```
+
+<Note>
+  Use indexes on foreign key columns for better query performance.
+</Note>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Check Before Changing" icon="check">
+    - Use `hasTable()` before creating/dropping tables
+    - Use `hasColumn()` before adding/dropping columns
+    - Prevents errors if migration runs multiple times
+    - Makes migrations idempotent
+  </Accordion>
+
+  <Accordion title="Use Transactions" icon="rotate">
+    - Always set `config: { transaction: true }`
+    - Pass `transacting(transaction)` to all operations
+    - Ensures atomic operations (all or nothing)
+    - Automatically rolls back on errors
+  </Accordion>
+
+  <Accordion title="Implement Down Migrations" icon="arrow-down">
+    - Always implement the `down` function
+    - Make it reverse the `up` function exactly
+    - Test both up and down migrations
+    - Enables rollback if needed
+  </Accordion>
+
+  <Accordion title="Add Logging" icon="file-lines">
+    - Log what the migration is doing
+    - Log when skipping operations
+    - Helps with debugging
+    - Use `@tryghost/logging` module
+  </Accordion>
+
+  <Accordion title="Keep Migrations Small" icon="minimize">
+    - One logical change per migration
+    - Create multiple migrations instead of one large one
+    - Easier to debug and rollback
+    - Better version control
+  </Accordion>
+
+  <Accordion title="Use Consistent Naming" icon="tag">
+    - Follow the numbering convention (01-, 02-, etc.)
+    - Use descriptive action names
+    - Use your plugin prefix for table names
+    - Be consistent with your naming style
+  </Accordion>
+</AccordionGroup>
+
+## Complete Example
+
+Here's a complete migration example creating a table with all common patterns:
+
+```javascript migrations/01-create-items-table.js
+let logging = require('@tryghost/logging');
+
+module.exports = {
+    config: {
+        transaction: true
+    },
+
+    up: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.hasTable('mp_items').transacting(transaction)
+            .then(function (hasTable) {
+                if (hasTable) {
+                    logging.info('Table mp_items already exists, skipping');
+                    return;
+                }
+
+                logging.info('Creating table: mp_items');
+
+                return connection.schema.createTable('mp_items', function (table) {
+                    // Primary key (UUID)
+                    table.uuid('id').primary();
+
+                    // Basic fields
+                    table.string('name', 191).notNullable();
+                    table.string('slug', 191).notNullable().unique();
+
+                    // Text content
+                    table.text('description').nullable();
+                    table.text('content', 'longtext').nullable();
+
+                    // Status and flags
+                    table.enum('status', ['draft', 'published', 'archived'])
+                        .defaultTo('draft');
+                    table.boolean('is_active').defaultTo(true);
+                    table.boolean('is_featured').defaultTo(false);
+
+                    // Numeric fields
+                    table.integer('sort_order').unsigned().defaultTo(0);
+                    table.integer('view_count').unsigned().defaultTo(0);
+
+                    // Foreign key
+                    table.uuid('category_id').nullable();
+
+                    // Timestamps
+                    table.dateTime('created_at').notNullable();
+                    table.dateTime('updated_at').nullable();
+                    table.dateTime('published_at').nullable();
+                    table.dateTime('deleted_at').nullable();
+
+                    // Indexes
+                    table.index('slug');
+                    table.index('status');
+                    table.index('category_id');
+                    table.index(['status', 'is_active']);
+                    table.index('published_at');
+                }).transacting(transaction);
+            });
+    },
+
+    down: function (options) {
+        let connection = options.connection;
+        let transaction = options.transacting;
+
+        return connection.schema.hasTable('mp_items').transacting(transaction)
+            .then(function (hasTable) {
+                if (!hasTable) {
+                    logging.info('Table mp_items does not exist, skipping');
+                    return;
+                }
+
+                logging.info('Dropping table: mp_items');
+
+                return connection.schema.dropTableIfExists('mp_items')
+                    .transacting(transaction);
+            });
+    }
+};
+```
+
+## Migration Execution Order
+
+Migrations run in alphabetical/numerical order:
+
+```bash
+migrations/
+├── 01-create-items-table.js        # Runs first
+├── 02-create-categories-table.js   # Runs second
+├── 03-create-item-category.js      # Runs third
+└── 04-add-status-to-items.js       # Runs fourth
+```
+
+<Warning>
+  The CMS tracks which migrations have run. Never modify existing migrations after they've been deployed. Create a new migration instead.
+</Warning>
+
+## Testing Migrations
+
+Test your migrations before deploying:
+
+```bash
+# In your plugin directory
+cd your-plugin/
+
+# Test up migration
+# (The CMS will run this automatically when activating)
+
+# Test down migration
+# (You'll need to manually test rollback scenarios)
+```
+
+<Tip>
+  Always test both `up` and `down` migrations to ensure they work correctly and are truly reversible.
+</Tip>
+
+## Common Patterns
+
+### Creating Junction Tables
+
+For many-to-many relationships:
+
+```javascript
+return connection.schema.createTable('mp_item_tag', function (table) {
+    table.uuid('id').primary();
+    table.uuid('item_id').notNullable();
+    table.uuid('tag_id').notNullable();
+    table.integer('sort_order').defaultTo(0);
+
+    // Composite index for unique constraint
+    table.index(['item_id', 'tag_id']);
+
+    // Individual indexes for queries
+    table.index('item_id');
+    table.index('tag_id');
+}).transacting(transaction);
+```
+
+### Adding Multiple Columns
+
+```javascript
+return connection.schema.table('mp_items', function (table) {
+    table.string('meta_title', 300).nullable();
+    table.string('meta_description', 500).nullable();
+    table.string('og_image', 2000).nullable();
+}).transacting(transaction);
+```
+
+### Renaming Columns
+
+```javascript
+return connection.schema.table('mp_items', function (table) {
+    table.renameColumn('old_name', 'new_name');
+}).transacting(transaction);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Models" icon="database" href="/core-concepts/models">
+    Define Bookshelf models for your tables
+  </Card>
+  <Card title="Schema Definition" icon="table" href="/core-concepts/models#model-schema-definition">
+    Learn about schema.js definition
+  </Card>
+  <Card title="Services" icon="gears" href="/building/services">
+    Create services to use your models
+  </Card>
+  <Card title="Data Management" icon="list" href="/building/data-management">
+    Build CRUD operations
+  </Card>
+</CardGroup>

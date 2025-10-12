@@ -1,0 +1,753 @@
+---
+title: 'Views & Templates'
+description: 'Create Handlebars templates for your plugin frontend'
+---
+
+## Overview
+
+Views are Handlebars (.hbs) templates that render HTML pages for your plugin. They integrate with the CMS theme system and receive data from controllers.
+
+<Info>
+  Views use Handlebars templating engine, which extends HTML with dynamic data binding and control flow.
+</Info>
+
+## View Structure
+
+Views are stored in your plugin's `views/` directory:
+
+```bash
+your-plugin/
+├── views/
+│   ├── list-items.hbs        # List page
+│   ├── item-detail.hbs       # Detail page
+│   ├── dashboard.hbs         # Dashboard page
+│   └── partials/             # Reusable components (optional)
+│       ├── item-card.hbs
+│       └── pagination.hbs
+```
+
+## Basic Template Structure
+
+Every view file follows this pattern:
+
+```handlebars views/list-items.hbs
+{{!< ../default}}
+
+<style>
+  /* Scoped styles for this view */
+  .item-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+  }
+</style>
+
+<div class="container">
+    <h1>{{title}}</h1>
+
+    {{#if items}}
+    <div class="grid">
+        {{#each items}}
+        <div class="item-card">
+            <h3>{{name}}</h3>
+            <p>{{description}}</p>
+        </div>
+        {{/each}}
+    </div>
+    {{else}}
+    <p>No items found.</p>
+    {{/if}}
+</div>
+
+<script>
+  // JavaScript for this view
+  console.log('View loaded');
+</script>
+```
+
+## Template Inheritance
+
+Use `{{!< ../default}}` to extend the theme's default layout:
+
+```handlebars
+{{!< ../default}}
+
+<!-- Your content here -->
+```
+
+<Note>
+  The `../default` layout is provided by the active theme and includes the site header, footer, and base styles.
+</Note>
+
+## Handlebars Syntax
+
+### Variables
+
+Access data passed from controllers:
+
+```handlebars
+<h1>{{title}}</h1>
+<p>{{description}}</p>
+<img src="{{image_url}}" alt="{{image_alt}}">
+```
+
+### Nested Objects
+
+Access nested properties with dot notation:
+
+```handlebars
+<h2>{{item.name}}</h2>
+<p>{{item.description}}</p>
+<span>{{item.category.name}}</span>
+```
+
+### Conditionals
+
+Show content conditionally:
+
+<CodeGroup>
+```handlebars If Statement
+{{#if is_active}}
+<span class="badge badge-success">Active</span>
+{{else}}
+<span class="badge badge-danger">Inactive</span>
+{{/if}}
+```
+
+```handlebars Unless (Inverse If)
+{{#unless items}}
+<p>No items available.</p>
+{{/unless}}
+```
+
+```handlebars Multiple Conditions
+{{#if is_featured}}
+<span class="badge">Featured</span>
+{{else if is_new}}
+<span class="badge">New</span>
+{{else}}
+<span class="badge">Regular</span>
+{{/if}}
+```
+</CodeGroup>
+
+### Loops
+
+Iterate over arrays:
+
+```handlebars
+<ul>
+{{#each items}}
+    <li>
+        <h3>{{name}}</h3>
+        <p>{{description}}</p>
+
+        <!-- Access parent context -->
+        <small>From: {{../page.title}}</small>
+
+        <!-- Loop metadata -->
+        <span>Item {{@index}} of {{@length}}</span>
+
+        {{#if @first}}
+        <span class="badge">First</span>
+        {{/if}}
+
+        {{#if @last}}
+        <span class="badge">Last</span>
+        {{/if}}
+    </li>
+{{/each}}
+</ul>
+```
+
+### Comparisons
+
+Compare values using helpers:
+
+```handlebars
+{{#if (eq status "published")}}
+<span>Published</span>
+{{/if}}
+
+{{#if (gt quantity 0)}}
+<button>Add to Cart</button>
+{{else}}
+<span>Out of Stock</span>
+{{/if}}
+
+{{#if (or is_featured is_new)}}
+<span class="badge">Special</span>
+{{/if}}
+```
+
+## Complete View Examples
+
+### List View
+
+```handlebars views/list-items.hbs
+{{!< ../default}}
+
+<style>
+  /* Define header height variable */
+  :root {
+    --header-height: 80px;
+  }
+
+  /* Custom spacing using CSS variable */
+  .page-wrapper {
+    padding-top: calc(var(--header-height) + 20px);
+  }
+</style>
+
+<div class="min-h-screen bg-gray-50 page-wrapper">
+    <div class="container mx-auto px-4 py-6">
+
+        <!-- Breadcrumb -->
+        <nav class="mb-6">
+            <ol class="flex items-center gap-2 text-sm text-gray-600">
+                <li><a href="/" class="hover:underline">Home</a></li>
+                <li>/</li>
+                <li class="text-gray-900 font-semibold">{{page.title}}</li>
+            </ol>
+        </nav>
+
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">{{title}}</h1>
+            {{#if description}}
+            <p class="text-lg text-gray-600 mt-2">{{description}}</p>
+            {{/if}}
+        </div>
+
+        <!-- Items Grid -->
+        {{#if items}}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {{#each items}}
+            <div class="bg-white border border-gray-200 rounded-xl p-5 hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                {{#if featured_image}}
+                <img src="{{featured_image}}"
+                     alt="{{name}}"
+                     class="w-full h-48 object-cover rounded-lg mb-4">
+                {{/if}}
+
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">
+                    <a href="/my-plugin/items/{{slug}}" class="hover:text-blue-600 transition-colors">
+                        {{name}}
+                    </a>
+                </h3>
+
+                {{#if description}}
+                <p class="text-gray-600 mb-4">{{description}}</p>
+                {{/if}}
+
+                <div class="flex items-center justify-between">
+                    {{#if is_active}}
+                    <span class="text-sm text-green-600 font-semibold">Active</span>
+                    {{else}}
+                    <span class="text-sm text-gray-400">Inactive</span>
+                    {{/if}}
+
+                    <a href="/my-plugin/items/{{slug}}"
+                       class="text-blue-600 hover:text-blue-800 font-semibold transition-colors">
+                        View Details →
+                    </a>
+                </div>
+            </div>
+            {{/each}}
+        </div>
+        {{else}}
+        <!-- Empty State -->
+        <div class="text-center py-20 bg-white rounded-xl shadow-sm">
+            <i class="fas fa-box-open text-6xl text-gray-300 mb-4"></i>
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">No Items Found</h3>
+            <p class="text-gray-600">There are no items to display at this time.</p>
+        </div>
+        {{/if}}
+    </div>
+</div>
+```
+
+### Detail View
+
+```handlebars views/item-detail.hbs
+{{!< ../default}}
+
+<style>
+  /* Define header height variable */
+  :root {
+    --header-height: 80px;
+  }
+
+  /* Custom spacing using CSS variable */
+  .page-wrapper {
+    padding-top: calc(var(--header-height) + 20px);
+  }
+
+  /* Complex grid layout requiring auto-fill */
+  .image-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+  }
+</style>
+
+<div class="min-h-screen page-wrapper">
+    <div class="container mx-auto px-4 py-6">
+
+        <!-- Breadcrumb -->
+        <nav class="mb-6">
+            <ol class="flex items-center gap-2 text-sm text-gray-600">
+                <li><a href="/" class="hover:underline">Home</a></li>
+                <li>/</li>
+                <li><a href="/my-plugin/items" class="hover:underline">Items</a></li>
+                <li>/</li>
+                <li class="text-gray-900 font-semibold">{{item.name}}</li>
+            </ol>
+        </nav>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+            <!-- Images -->
+            <div>
+                {{#if item.featured_image}}
+                <img src="{{item.featured_image}}"
+                     alt="{{item.name}}"
+                     class="w-full rounded-xl mb-4">
+                {{/if}}
+
+                {{#if item.attachments}}
+                <div class="image-gallery">
+                    {{#each item.attachments}}
+                    <img src="{{url}}" alt="{{type}}" class="cursor-pointer rounded-lg hover:scale-105 transition-transform duration-200">
+                    {{/each}}
+                </div>
+                {{/if}}
+            </div>
+
+            <!-- Details -->
+            <div>
+                <h1 class="text-4xl font-bold text-gray-900 mb-4">{{item.name}}</h1>
+
+                {{#if item.category}}
+                <div class="mb-4">
+                    <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                        {{item.category.name}}
+                    </span>
+                </div>
+                {{/if}}
+
+                {{#if item.description}}
+                <div class="prose max-w-none mb-6">
+                    <p class="text-gray-600 text-lg">{{item.description}}</p>
+                </div>
+                {{/if}}
+
+                <!-- Meta Information -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                        <i class="fas fa-calendar text-blue-600"></i>
+                        <div>
+                            <p class="text-xs text-gray-500">Created</p>
+                            <p class="font-semibold text-gray-900">{{item.created_at}}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                        <i class="fas fa-sync text-blue-600"></i>
+                        <div>
+                            <p class="text-xs text-gray-500">Updated</p>
+                            <p class="font-semibold text-gray-900">{{item.updated_at}}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tags -->
+                {{#if item.tags}}
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-2">Tags</h3>
+                    <div class="flex flex-wrap gap-2">
+                        {{#each item.tags}}
+                        <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                            {{value}}
+                        </span>
+                        {{/each}}
+                    </div>
+                </div>
+                {{/if}}
+
+                <!-- Actions -->
+                <div class="flex gap-4">
+                    {{#if item.is_active}}
+                    <button onclick="performAction('{{item.id}}')"
+                            class="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                        Take Action
+                    </button>
+                    {{else}}
+                    <button disabled class="px-6 py-3 bg-gray-300 text-gray-500 rounded-lg font-semibold cursor-not-allowed">
+                        Not Available
+                    </button>
+                    {{/if}}
+
+                    <a href="/my-plugin/items"
+                       class="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors">
+                        Back to List
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Related Items -->
+        {{#if relatedItems}}
+        <div class="mt-16">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Related Items</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {{#each relatedItems}}
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    {{#if featured_image}}
+                    <img src="{{featured_image}}"
+                         alt="{{name}}"
+                         class="w-full h-32 object-cover rounded mb-3">
+                    {{/if}}
+                    <h3 class="font-semibold text-gray-900 mb-1">{{name}}</h3>
+                    <a href="/my-plugin/items/{{slug}}"
+                       class="text-blue-600 hover:text-blue-800 text-sm font-semibold">
+                        View Details →
+                    </a>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+        {{/if}}
+    </div>
+</div>
+
+<script>
+function performAction(itemId) {
+    console.log('Action for item:', itemId);
+    // Add your action logic here
+}
+</script>
+```
+
+## Styling Views
+
+<Warning>
+  **Always use Tailwind CSS** for styling. Only use custom CSS when absolutely necessary (complex animations, CSS variables, or features not available in Tailwind).
+</Warning>
+
+### Available CSS Variables
+
+The theme provides these CSS custom properties:
+
+```css
+:root {
+  /* Brand Colors */
+  --brand-primary: /* Primary brand color */
+  --brand-dark: /* Dark brand color */
+  --brand-light: /* Light brand color */
+  --brand-accent: /* Accent brand color */
+  --brand-neutral: /* Neutral brand color */
+
+  /* Layout */
+  --header-height: /* Height of site header */
+}
+```
+
+### When to Use Custom CSS
+
+Only use `<style>` tags for:
+- Defining custom CSS variables
+- Complex animations not available in Tailwind
+- Using theme CSS variables
+- Grid layouts that require calc() or complex expressions
+
+```handlebars
+{{!< ../default}}
+
+<style>
+  :root {
+    --header-height: 80px;
+  }
+
+  /* Only when Tailwind cannot achieve this */
+  .custom-spacing {
+    padding-top: calc(var(--header-height) + 20px);
+  }
+</style>
+
+<!-- Use Tailwind for everything else -->
+<div class="container mx-auto px-4 py-6">
+    <h1 class="text-3xl font-bold text-gray-900">{{title}}</h1>
+</div>
+```
+
+## JavaScript in Views
+
+Add interactivity with inline JavaScript:
+
+```handlebars
+{{!< ../default}}
+
+<!-- HTML content -->
+
+<script>
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('View loaded');
+    initializeComponents();
+});
+
+function initializeComponents() {
+    // Setup event listeners
+    document.querySelectorAll('.action-button').forEach(button => {
+        button.addEventListener('click', handleAction);
+    });
+}
+
+function handleAction(event) {
+    const itemId = event.target.dataset.itemId;
+
+    // Make API call
+    fetch(`/my-plugin/api/items/${itemId}/action`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            action: 'perform'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Action completed successfully');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Action failed', 'error');
+    });
+}
+
+function showNotification(message, type = 'success') {
+    // Notification logic
+    console.log(message, type);
+}
+</script>
+```
+
+## Accessing Controller Data
+
+Controllers pass data to views via the `data` object:
+
+```javascript controllers/frontend.js
+async function listItems(req, res) {
+    const items = await Item.findAll();
+
+    const data = {
+        title: 'My Items',
+        description: 'Browse all items',
+        page: {
+            title: 'My Items',
+            slug: 'my-plugin/items',
+            url: '/my-plugin/items'
+        },
+        items: items.toJSON(),
+        member: req.member || null,
+        hasItems: items.length > 0
+    };
+
+    return renderer.renderer(req, res, data);
+}
+```
+
+Access in view:
+
+```handlebars
+<h1>{{title}}</h1>
+<p>{{description}}</p>
+
+{{#if member}}
+<p>Welcome, {{member.email}}</p>
+{{/if}}
+
+{{#if hasItems}}
+<!-- Show items -->
+{{else}}
+<!-- Show empty state -->
+{{/if}}
+```
+
+## Common Patterns
+
+### Pagination
+
+```handlebars
+{{#if meta.pagination}}
+<nav class="flex justify-center gap-2 mt-8">
+    {{#if meta.pagination.prev}}
+    <a href="?page={{meta.pagination.prev}}"
+       class="px-4 py-2 border rounded hover:bg-gray-50">
+        Previous
+    </a>
+    {{/if}}
+
+    <span class="px-4 py-2">
+        Page {{meta.pagination.page}} of {{meta.pagination.pages}}
+    </span>
+
+    {{#if meta.pagination.next}}
+    <a href="?page={{meta.pagination.next}}"
+       class="px-4 py-2 border rounded hover:bg-gray-50">
+        Next
+    </a>
+    {{/if}}
+</nav>
+{{/if}}
+```
+
+### Empty States
+
+```handlebars
+{{#if items}}
+<!-- Show items -->
+{{else}}
+<div class="text-center py-20">
+    <i class="fas fa-box-open text-6xl text-gray-300 mb-4"></i>
+    <h3 class="text-2xl font-bold text-gray-900 mb-2">No Items Found</h3>
+    <p class="text-gray-600 mb-6">There are no items to display.</p>
+    <a href="/my-plugin/create" class="btn btn-primary">
+        Create Your First Item
+    </a>
+</div>
+{{/if}}
+```
+
+### Loading States
+
+```handlebars
+<div id="items-container">
+    <!-- Items will be loaded here -->
+</div>
+
+<div id="loading-spinner" class="text-center py-10">
+    <i class="fas fa-spinner fa-spin text-4xl text-blue-600"></i>
+    <p class="text-gray-600 mt-2">Loading...</p>
+</div>
+
+<script>
+// Hide spinner when content loads
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('loading-spinner').style.display = 'none';
+});
+</script>
+```
+
+### Error Messages
+
+```handlebars
+{{#if error}}
+<div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+    <div class="flex items-center gap-3">
+        <i class="fas fa-exclamation-circle text-red-600 text-xl"></i>
+        <div>
+            <h4 class="font-semibold text-red-900">Error</h4>
+            <p class="text-red-700">{{error}}</p>
+        </div>
+    </div>
+</div>
+{{/if}}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Semantic HTML" icon="code">
+    - Use proper HTML5 elements
+    - Use heading hierarchy correctly (h1, h2, h3)
+    - Add ARIA labels for accessibility
+    - Use semantic elements (nav, article, section, aside)
+  </Accordion>
+
+  <Accordion title="Keep Views Simple" icon="minimize">
+    - Views should only display data
+    - No business logic in templates
+    - Use controllers for data processing
+    - Keep templates readable and maintainable
+  </Accordion>
+
+  <Accordion title="Handle Empty States" icon="box-open">
+    - Always check if data exists
+    - Provide helpful empty state messages
+    - Guide users on what to do next
+    - Use `{{#if}}` and `{{else}}` blocks
+  </Accordion>
+
+  <Accordion title="Mobile Responsive" icon="mobile">
+    - Use responsive CSS (Tailwind, Grid, Flexbox)
+    - Test on multiple screen sizes
+    - Use mobile-first approach
+    - Hide/show content based on screen size
+  </Accordion>
+
+  <Accordion title="Performance" icon="bolt">
+    - Minimize inline JavaScript
+    - Optimize images (lazy loading)
+    - Reduce unnecessary DOM elements
+    - Use CSS efficiently
+  </Accordion>
+
+  <Accordion title="Accessibility" icon="universal-access">
+    - Use proper contrast ratios
+    - Add alt text to images
+    - Use ARIA labels
+    - Keyboard navigation support
+  </Accordion>
+</AccordionGroup>
+
+## Helper Functions
+
+Common Handlebars helpers available:
+
+<CodeGroup>
+```handlebars Equality
+{{#if (eq status "active")}}
+Active
+{{/if}}
+```
+
+```handlebars Greater Than
+{{#if (gt quantity 0)}}
+In Stock
+{{/if}}
+```
+
+```handlebars Less Than
+{{#if (lt quantity 10)}}
+Low Stock
+{{/if}}
+```
+
+```handlebars Or
+{{#if (or is_featured is_new)}}
+Special Item
+{{/if}}
+```
+
+```handlebars And
+{{#if (and is_active is_available)}}
+Available Now
+{{/if}}
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Controllers" icon="code" href="/building/controllers">
+    Pass data to views from controllers
+  </Card>
+  <Card title="Routing" icon="route" href="/core-concepts/routing-system">
+    Connect routes to views
+  </Card>
+</CardGroup>

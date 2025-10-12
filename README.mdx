@@ -1,0 +1,121 @@
+# Faster CMS Plugin Development Documentation
+
+This is a Mintlify-powered documentation site for building plugins for Faster CMS.
+
+## Getting Started
+
+### Installation
+
+1. Install Mintlify CLI:
+```bash
+npm install -g mintlify
+```
+
+2. Navigate to the docs directory:
+```bash
+cd docs/mintlify
+```
+
+3. Start the local dev server:
+```bash
+mintlify dev
+```
+
+The documentation will be available at `http://localhost:3000`
+
+## Project Structure
+
+```
+mintlify/
+├── docs.json                       # Mintlify configuration
+├── introduction.mdx                # Home page
+├── quickstart.mdx                  # Quick start guide
+├── architecture.mdx                # Architecture overview
+│
+├── core-concepts/                  # Core concepts pages
+│   ├── plugin-lifecycle.mdx
+│   ├── routing-system.mdx
+│   ├── database-models.mdx
+│   ├── migrations.mdx
+│   ├── controllers.mdx
+│   └── services.mdx
+│
+├── building/                       # Step-by-step guides
+│   ├── setup.mdx
+│   ├── manifest.mdx
+│   ├── plugin-class.mdx
+│   ├── routes.mdx
+│   ├── models.mdx
+│   ├── migrations.mdx
+│   ├── controllers.mdx
+│   ├── services.mdx
+│   ├── views.mdx
+│   └── admin-panel.mdx
+│
+├── advanced/                       # Advanced topics
+│   ├── middleware.mdx
+│   ├── repositories.mdx
+│   ├── providers.mdx
+│   ├── events.mdx
+│   ├── validation.mdx
+│   └── settings.mdx
+│
+├── best-practices/                 # Best practices
+│   ├── database-design.mdx
+│   ├── code-organization.mdx
+│   ├── security.mdx
+│   ├── performance.mdx
+│   └── naming-conventions.mdx
+│
+├── deployment/                     # Testing & deployment
+│   ├── testing.mdx
+│   ├── debugging.mdx
+│   └── deployment-checklist.mdx
+│
+├── api-reference/                  # API documentation
+│   └── (API reference pages)
+│
+└── examples/                       # Examples
+    └── (Example pages)
+```
+
+## Deployment
+
+### Deploy to Mintlify
+
+1. Create a Mintlify account at https://mintlify.com
+2. Connect your GitHub repository
+3. Configure the build settings to point to `docs/mintlify`
+4. Push your changes to trigger deployment
+
+### Custom Domain
+
+Configure your custom domain in the Mintlify dashboard settings.
+
+## Contributing
+
+To add new documentation:
+
+1. Create a new `.mdx` file in the appropriate directory
+2. Add the page to `docs.json` navigation
+3. Use Mintlify components (Cards, Accordions, CodeGroups, etc.)
+4. Test locally with `mintlify dev`
+5. Commit and push
+
+## Mintlify Components
+
+Available components:
+- `<Card>` - Cards for highlighting content
+- `<CardGroup>` - Group multiple cards
+- `<Accordion>` - Collapsible content sections
+- `<AccordionGroup>` - Group accordions
+- `<Steps>` - Step-by-step instructions
+- `<Tabs>` - Tabbed content
+- `<CodeGroup>` - Multiple code examples
+- `<Note>`, `<Tip>`, `<Warning>`, `<Info>`, `<Check>` - Callout boxes
+
+## Resources
+
+- [Mintlify Documentation](https://mintlify.com/docs)
+- [Plugin SDK](https://github.com/TryGhost/SDK)
+- [Faster CMS](https://faster.com)

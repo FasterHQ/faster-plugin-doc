@@ -1,0 +1,87 @@
+---
+title: 'API Reference'
+description: 'Complete API reference for Faster CMS plugins'
+---
+
+## Plugin SDK API
+
+Reference documentation for the `@tryghost/plugin-sdk` package.
+
+### BasePlugin
+
+```javascript
+class BasePlugin {
+    constructor({name, version, pluginPath})
+    async onInit()
+    async onActivate()
+    getDefaultSettings()
+    async _validateSettings(settings)
+    registerService(name, service)
+    getService(name)
+    getSettings()
+    debug(message, ...args)
+}
+```
+
+### PluginRouter
+
+```javascript
+class PluginRouter {
+    constructor(prefix)
+    public(method, path, ...handlers)
+    member(method, path, ...handlers)
+    admin(method, path, ...handlers)
+    router()
+    getExpressRouter()
+}
+```
+
+## Bookshelf Models
+
+### Model Methods
+
+<CodeGroup>
+```javascript Static Methods
+Model.add(data, options)
+Model.edit(data, options)
+Model.findOne(filter, options)
+Model.findAll(filter, options)
+Model.findPage(options)
+Model.destroy(filter, options)
+```
+
+```javascript Instance Methods
+model.save()
+model.destroy()
+model.related(name)
+model.get(attribute)
+model.set(attribute, value)
+```
+
+```javascript Relationships
+model.hasMany(Model, foreignKey)
+model.belongsTo(Model, foreignKey)
+model.belongsToMany(Model, table, foreignKey, otherKey)
+```
+</CodeGroup>
+
+## Ghost Errors
+
+```javascript
+const errors = require('@tryghost/errors');
+
+throw new errors.ValidationError({message: 'Invalid input'});
+throw new errors.NotFoundError({message: 'Not found'});
+throw new errors.InternalServerError({message: 'Server error'});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Examples" href="/examples">
+    See working code examples
+  </Card>
+  <Card title="Architecture" href="/architecture">
+    Understand the architecture
+  </Card>
+</CardGroup>

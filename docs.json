@@ -1,0 +1,98 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Faster CMS Plugin Development",
+  "theme": "mint",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373"
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:support@faster.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Dashboard",
+    "url": "https://dashboard.faster.com"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    },
+    {
+      "name": "Examples",
+      "url": "examples"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Documentation",
+      "icon": "book-open-cover",
+      "url": "https://faster.com/docs"
+    },
+    {
+      "name": "Community",
+      "icon": "slack",
+      "url": "https://faster.com/community"
+    },
+    {
+      "name": "Blog",
+      "icon": "newspaper",
+      "url": "https://faster.com/blog"
+    }
+  ],
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "quickstart",
+          "architecture"
+        ]
+      },
+      {
+        "group": "Core Concepts",
+        "pages": [
+          "core-concepts/plugin-lifecycle",
+          "core-concepts/routing-system"
+        ]
+      },
+      {
+        "group": "Building Your Plugin",
+        "pages": [
+          "building/setup",
+          "building/manifest",
+          "building/plugin-class",
+          "building/routes",
+          "core-concepts/models",
+          "building/migrations",
+          "building/controllers",
+          "building/services",
+          "building/views",
+          "building/admin-panel"
+        ]
+      },
+      {
+        "group": "Testing & Deployment",
+        "pages": [
+          "deployment/testing",
+          "deployment/debugging",
+          "deployment/deployment-checklist"
+        ]
+      }
+    ]
+  },
+  "footerSocials": {
+    "github": "https://github.com/FasterHQ",
+    "twitter": "https://twitter.com/FasterHQ"
+  }
+}

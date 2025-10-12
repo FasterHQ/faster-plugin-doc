@@ -1,0 +1,319 @@
+---
+title: 'Quickstart'
+description: 'Create your first Faster CMS plugin in under 5 minutes'
+---
+
+## Setup Your Development Environment
+
+<AccordionGroup>
+  <Accordion title="Prerequisites" icon="list-check">
+    Before you begin, ensure you have:
+    - Node.js 18 or higher
+    - Faster CMS installed locally
+    - Code editor (VS Code recommended)
+    - Basic knowledge of JavaScript/Node.js
+  </Accordion>
+
+  <Accordion title="Directory Structure" icon="folder-tree">
+    Plugins are located in:
+    ```bash
+    ghost/core/content/plugins/your-plugin-name/
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Create Your First Plugin
+
+<Steps>
+  <Step title="Create Plugin Directory">
+    Navigate to your CMS installation and create a new plugin folder:
+
+    ```bash
+    cd ghost/core/content/plugins
+    mkdir my-first-plugin
+    cd my-first-plugin
+    ```
+  </Step>
+
+  <Step title="Create Manifest File">
+    Create `manifest.json` with basic plugin metadata:
+
+    ```json manifest.json
+    {
+      "name": "My First Plugin",
+      "package_name": "my-first-plugin",
+      "version": "1.0.0",
+      "description": "My first Faster CMS plugin",
+      "routing": "myplugin",
+      "permissions": ["admin", "database"],
+      "settings": {
+        "enabled": true
+      }
+    }
+    ```
+
+    <Note>
+      The `routing` field defines your URL prefix: `/myplugin/*`
+    </Note>
+  </Step>
+
+  <Step title="Create Plugin Entry Point">
+    Create `index.js` with your plugin class:
+
+    ```javascript index.js
+    const {BasePlugin} = require('@tryghost/plugin-sdk');
+
+    class MyFirstPlugin extends BasePlugin {
+        constructor() {
+            super({
+                name: 'my-first-plugin',
+                version: '1.0.0',
+                pluginPath: __dirname
+            });
+        }
+
+        async onInit() {
+            this.debug('My First Plugin initialized!');
+        }
+
+        getDefaultSettings() {
+            return {
+                enabled: true,
+                welcomeMessage: 'Hello from my plugin!'
+            };
+        }
+    }
+
+    module.exports = new MyFirstPlugin();
+    ```
+
+    <Tip>
+      The `onInit()` lifecycle hook is called when your plugin loads.
+    </Tip>
+  </Step>
+
+  <Step title="Create Routes">
+    Create `routes.js` to define your plugin's endpoints:
+
+    ```javascript routes.js
+    const {PluginRouter} = require('@tryghost/plugin-sdk');
+    const manifest = require('./manifest.json');
+
+    const router = new PluginRouter(manifest.routing || 'myplugin');
+
+    // Simple public route
+    router.public('get', '/', (req, res) => {
+        res.send('<h1>Welcome to My First Plugin!</h1>');
+    });
+
+    // Admin-only route
+    router.admin('get', '/settings', (req, res) => {
+        const plugin = require('./index');
+        const settings = plugin.getSettings();
+        res.json({settings});
+    });
+
+    module.exports = {
+        router: function () {
+            return router.router();
+        }
+    };
+    ```
+  </Step>
+
+  <Step title="Restart CMS">
+    Restart your CMS instance to load the plugin:
+
+    ```bash
+    # From your CMS root directory
+    ghost restart
+
+    # Or if using npm
+    npm start
+    ```
+  </Step>
+
+  <Step title="Test Your Plugin">
+    Visit your plugin's URL in the browser:
+
+    ```
+    http://localhost:2368/myplugin/
+    ```
+
+    You should see: **Welcome to My First Plugin!**
+
+    <Check>
+      **Success!** Your plugin is now running.
+    </Check>
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Add Database Models"
+    icon="database"
+    href="/building/models"
+  >
+    Learn how to create database tables and models
+  </Card>
+  <Card
+    title="Create Controllers"
+    icon="code"
+    href="/building/controllers"
+  >
+    Build request handlers for your routes
+  </Card>
+  <Card
+    title="Build Admin Interface"
+    icon="desktop"
+    href="/building/admin-panel"
+  >
+    Create an admin panel with React
+  </Card>
+  <Card
+    title="Add Services"
+    icon="gears"
+    href="/building/services"
+  >
+    Organize business logic with services
+  </Card>
+</CardGroup>
+
+## Understanding What You Built
+
+Let's break down the key files:
+
+<CodeGroup>
+```json manifest.json
+{
+  "routing": "myplugin",  // URL prefix for all routes
+  "permissions": [        // Required permissions
+    "admin",
+    "database"
+  ],
+  "settings": {}          // Default plugin settings
+}
+```
+
+```javascript index.js
+class MyFirstPlugin extends BasePlugin {
+    async onInit() {
+        // Called when plugin initializes
+    }
+
+    getDefaultSettings() {
+        // Define default configuration
+    }
+}
+```
+
+```javascript routes.js
+// Public route (no auth required)
+router.public('get', '/', handler);
+
+// Member route (logged-in members)
+router.member('get', '/dashboard', handler);
+
+// Admin route (admin users only)
+router.admin('get', '/settings', handler);
+```
+</CodeGroup>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Plugin not loading" icon="triangle-exclamation">
+    **Solution**: Check that:
+    - Plugin is in `ghost/core/content/plugins/` directory
+    - `manifest.json` and `index.js` exist
+    - CMS was restarted after adding the plugin
+    - Check logs for errors: `ghost log`
+  </Accordion>
+
+  <Accordion title="Routes return 404" icon="triangle-exclamation">
+    **Solution**: Verify:
+    - Routes are defined in `routes.js`
+    - `routes.js` exports router correctly
+    - URL matches your `routing` prefix in manifest.json
+    - Example: `/myplugin/` not `/my-first-plugin/`
+  </Accordion>
+
+  <Accordion title="Permission errors" icon="triangle-exclamation">
+    **Solution**: Ensure:
+    - Requested permissions are in manifest.json
+    - Using correct route type (public/member/admin)
+    - Admin routes require admin login
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Tips
+
+Enable debug logging in your plugin:
+
+```javascript
+// In your plugin class
+async onInit() {
+    this.debug('Plugin initialized');
+    this.debug('Settings:', this.getSettings());
+}
+
+// Or use the logging utility
+const logging = require('@tryghost/logging');
+logging.info('Important info');
+logging.error('Error occurred', error);
+```
+
+View logs:
+
+```bash
+# View live logs
+ghost log
+
+# Or check log files
+tail -f ghost/content/logs/ghost.log
+```
+
+<Warning>
+  Always test plugins in a development environment before deploying to production.
+</Warning>
+
+## Project Structure
+
+Your plugin directory should now look like this:
+
+```
+my-first-plugin/
+├── index.js           # Plugin entry point
+├── manifest.json      # Plugin metadata
+└── routes.js          # Route definitions
+```
+
+## What's Next?
+
+<Steps>
+  <Step title="Learn Core Concepts">
+    Understand the [plugin lifecycle](/core-concepts/plugin-lifecycle) and [routing system](/core-concepts/routing-system).
+  </Step>
+
+  <Step title="Add a Database">
+    Create your first [model](/building/models) and [migration](/building/migrations).
+  </Step>
+
+  <Step title="Build Features">
+    Add [controllers](/building/controllers), [services](/building/services), and [views](/building/views).
+  </Step>
+
+  <Step title="Study Examples">
+    Explore the [e-commerce plugin example](/examples/ecommerce-plugin) for real-world patterns.
+  </Step>
+</Steps>
+
+<Card
+  title="Ready to dive deeper?"
+  icon="book"
+  href="/architecture"
+>
+  Learn about the complete plugin architecture
+</Card>

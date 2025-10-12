@@ -1,0 +1,54 @@
+---
+title: 'Simple Blog Plugin'
+description: 'Build a simple blog extension plugin'
+---
+
+## Overview
+
+A minimal example showing core plugin concepts.
+
+## Features
+
+- Custom post types
+- Categories
+- Comments system
+
+## Code
+
+See the [GitHub repository](https://github.com/FasterHQ/example-plugins) for complete source code.
+
+## Key Files
+
+<CodeGroup>
+```javascript index.js
+const {BasePlugin} = require('@tryghost/plugin-sdk');
+
+class BlogExtension extends BasePlugin {
+    constructor() {
+        super({name: 'blog-extension', version: '1.0.0', pluginPath: __dirname});
+    }
+
+    async onInit() {
+        this.debug('Blog Extension initialized');
+    }
+}
+
+module.exports = new BlogExtension();
+```
+
+```json manifest.json
+{
+  "name": "Blog Extension",
+  "package_name": "blog-extension",
+  "version": "1.0.0",
+  "routing": "blog-ext",
+  "permissions": ["database"]
+}
+```
+</CodeGroup>
+
+## Next Steps
+
+<Card title="E-commerce Example" href="/examples/ecommerce-plugin">
+  See a complete production example
+</Card>

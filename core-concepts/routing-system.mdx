@@ -1,0 +1,487 @@
+---
+title: 'Routing System'
+description: 'Create routes with role-based authentication and middleware'
+---
+
+## Overview
+
+Faster CMS uses the PluginRouter from `@tryghost/plugin-sdk` to create routes with built-in authentication, middleware support, and automatic URL prefixing.
+
+## Basic Setup
+
+```javascript routes.js
+const {PluginRouter} = require('@tryghost/plugin-sdk');
+const manifest = require('./manifest.json');
+
+// Create router with URL prefix from manifest
+const router = new PluginRouter(manifest.routing || 'myplugin');
+
+// Define routes here...
+
+module.exports = {
+    router: function () {
+        return router.router();
+    },
+    instance: function () {
+        return router;
+    }
+};
+```
+
+<Info>
+  The `routing` value in manifest.json becomes your URL prefix. If `routing: "myplugin"`, all routes will be under `/myplugin/*`
+</Info>
+
+## Route Types
+
+### Public Routes
+
+No authentication required - accessible to everyone:
+
+```javascript
+router.public('get', '/', controller.index);
+router.public('get', '/items/:slug', controller.itemDetail);
+router.public('post', '/api/action', controller.performAction);
+```
+
+### Member Routes
+
+Requires logged-in member:
+
+```javascript
+router.member('get', '/dashboard', controller.dashboard);
+router.member('get', '/my-items', controller.myItems);
+router.member('post', '/api/create', controller.create);
+```
+
+<Note>
+  Member routes use Ghost's member authentication. Users must be logged in through Ghost's member system.
+</Note>
+
+### Admin Routes
+
+Requires admin user (Ghost admin panel access):
+
+```javascript
+router.admin('get', '/settings', controller.getSettings);
+router.admin('put', '/settings', controller.updateSettings);
+router.admin('get', '/data/:model', controller.listRecords);
+router.admin('post', '/data/:model', controller.createRecord);
+```
+
+<Warning>
+  Admin routes are protected and only accessible to users with admin privileges.
+</Warning>
+
+## HTTP Methods
+
+All standard HTTP methods are supported:
+
+<CodeGroup>
+```javascript GET
+router.public('get', '/items', controller.list);
+```
+
+```javascript POST
+router.public('post', '/api/items', controller.create);
+```
+
+```javascript PUT
+router.admin('put', '/items/:id', controller.update);
+```
+
+```javascript PATCH
+router.admin('patch', '/items/:id', controller.partialUpdate);
+```
+
+```javascript DELETE
+router.admin('delete', '/items/:id', controller.delete);
+```
+</CodeGroup>
+
+## Route Parameters
+
+### Path Parameters
+
+```javascript
+router.public('get', '/items/:slug', (req, res) => {
+    const slug = req.params.slug;
+    res.send(`Item slug: ${slug}`);
+});
+
+router.public('get', '/groups/:groupId/items/:itemId', (req, res) => {
+    const {groupId, itemId} = req.params;
+    res.json({groupId, itemId});
+});
+```
+
+### Query Parameters
+
+```javascript
+router.public('get', '/items', (req, res) => {
+    const {page = 1, limit = 20, sort = 'name'} = req.query;
+    // URL: /myplugin/items?page=2&limit=10&sort=name
+});
+```
+
+### Request Body
+
+```javascript
+router.public('post', '/api/item/add', (req, res) => {
+    const {itemId, quantity} = req.body;
+    // Requires body-parser middleware
+});
+```
+
+## Middleware
+
+### Global Middleware
+
+Apply to all routes in your plugin:
+
+```javascript routes.js
+const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
+
+const router = new PluginRouter('myplugin');
+const expressRouter = router.getExpressRouter();
+
+// Parse JSON bodies
+expressRouter.use(bodyParser.json());
+
+// Parse URL-encoded bodies
+expressRouter.use(bodyParser.urlencoded({extended: true}));
+
+// Parse cookies
+expressRouter.use(cookieParser());
+
+// Custom middleware
+expressRouter.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`);
+    next();
+});
+```
+
+### Route-Specific Middleware
+
+```javascript
+const authMiddleware = require('./middleware/auth');
+
+router.public('post', '/api/protected', authMiddleware, controller.action);
+```
+
+### Middleware Chain
+
+```javascript
+const validate = require('./middleware/validate');
+const rateLimit = require('./middleware/rate-limit');
+const logger = require('./middleware/logger');
+
+router.public('post', '/api/action',
+    logger,
+    rateLimit,
+    validate,
+    controller.action
+);
+```
+
+## Request Object
+
+The request object contains:
+
+```javascript
+router.public('get', '/example', (req, res) => {
+    // Route parameters
+    req.params.id
+
+    // Query parameters
+    req.query.page
+
+    // Request body
+    req.body.data
+
+    // Member info (if authenticated)
+    req.member.id
+    req.member.email
+
+    // Headers
+    req.headers['user-agent']
+
+    // Cookies
+    req.cookies.cartId
+
+    // Full URL
+    req.url
+    req.originalUrl
+    req.path
+
+    // HTTP method
+    req.method
+});
+```
+
+## Response Methods
+
+### JSON Response
+
+```javascript
+router.public('get', '/api/items', async (req, res) => {
+    const items = await getItems();
+    res.json({
+        items: items,
+        total: items.length
+    });
+});
+```
+
+### HTML Response
+
+```javascript
+router.public('get', '/items', (req, res) => {
+    res.send('<h1>Items</h1>');
+});
+```
+
+### Render Template
+
+```javascript
+router.public('get', '/items/:slug', async (req, res) => {
+    const item = await getItem(req.params.slug);
+    res.render('item-detail', {
+        item: item,
+        title: item.name
+    });
+});
+```
+
+### Redirects
+
+```javascript
+router.public('post', '/login', (req, res) => {
+    // Redirect to another route
+    res.redirect('/dashboard');
+
+    // Redirect with status code
+    res.redirect(301, '/new-url');
+});
+```
+
+### Status Codes
+
+```javascript
+// 200 OK
+res.json({success: true});
+
+// 201 Created
+res.status(201).json({item: newItem});
+
+// 204 No Content
+res.status(204).send();
+
+// 400 Bad Request
+res.status(400).json({error: 'Invalid input'});
+
+// 404 Not Found
+res.status(404).json({error: 'Item not found'});
+
+// 500 Internal Server Error
+res.status(500).json({error: 'Server error'});
+```
+
+## Error Handling
+
+### Try-Catch Pattern
+
+```javascript
+router.public('get', '/items/:id', async (req, res) => {
+    try {
+        const item = await Item.findOne({id: req.params.id});
+
+        if (!item) {
+            return res.status(404).json({
+                error: 'Item not found'
+            });
+        }
+
+        res.json({item});
+    } catch (error) {
+        console.error('Error fetching item:', error);
+        res.status(500).json({
+            error: 'Failed to fetch item'
+        });
+    }
+});
+```
+
+### Error Middleware
+
+```javascript
+// Add at the end of your routes
+expressRouter.use((err, req, res, next) => {
+    console.error(err.stack);
+
+    res.status(err.statusCode || 500).json({
+        error: err.message || 'Internal server error'
+    });
+});
+```
+
+## Custom Middleware Examples
+
+### Authentication Middleware
+
+```javascript middleware/auth.js
+async function authMiddleware(req, res, next) {
+    const token = req.headers['authorization'];
+
+    if (!token) {
+        return res.status(401).json({error: 'No token provided'});
+    }
+
+    try {
+        const user = await verifyToken(token);
+        req.user = user;
+        next();
+    } catch (error) {
+        res.status(401).json({error: 'Invalid token'});
+    }
+}
+
+module.exports = authMiddleware;
+```
+
+### Validation Middleware
+
+```javascript middleware/validate.js
+function validateItem(req, res, next) {
+    const {name, value} = req.body;
+
+    if (!name || name.length < 3) {
+        return res.status(400).json({
+            error: 'Name must be at least 3 characters'
+        });
+    }
+
+    if (value !== undefined && value < 0) {
+        return res.status(400).json({
+            error: 'Value must be positive'
+        });
+    }
+
+    next();
+}
+
+module.exports = validateItem;
+```
+
+### Rate Limiting
+
+```javascript middleware/rate-limit.js
+const rateLimit = new Map();
+
+function rateLimitMiddleware(req, res, next) {
+    const ip = req.ip;
+    const now = Date.now();
+    const windowMs = 60000; // 1 minute
+    const maxRequests = 100;
+
+    if (!rateLimit.has(ip)) {
+        rateLimit.set(ip, {count: 1, resetTime: now + windowMs});
+        return next();
+    }
+
+    const record = rateLimit.get(ip);
+
+    if (now > record.resetTime) {
+        record.count = 1;
+        record.resetTime = now + windowMs;
+        return next();
+    }
+
+    if (record.count >= maxRequests) {
+        return res.status(429).json({
+            error: 'Too many requests'
+        });
+    }
+
+    record.count++;
+    next();
+}
+
+module.exports = rateLimitMiddleware;
+```
+
+### Logging Middleware
+
+```javascript middleware/logger.js
+const logging = require('@tryghost/logging');
+
+function loggerMiddleware(req, res, next) {
+    const start = Date.now();
+
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        logging.info(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
+    });
+
+    next();
+}
+
+module.exports = loggerMiddleware;
+```
+
+## URL Structure
+
+With `routing: "myplugin"` in manifest.json:
+
+```
+Public:     /myplugin/items
+Member:     /myplugin/dashboard
+Admin:      /myplugin/admin/settings
+
+API:        /myplugin/api/action
+Sitemap:    /myplugin/sitemap.xml
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Appropriate Route Types" icon="shield">
+    - Public routes for general access
+    - Member routes for user-specific data
+    - Admin routes for management operations
+    - Never expose sensitive operations on public routes
+  </Accordion>
+
+  <Accordion title="Validate Input" icon="check">
+    - Always validate request parameters
+    - Sanitize user input
+    - Check required fields
+    - Validate data types and formats
+  </Accordion>
+
+  <Accordion title="Handle Errors Properly" icon="triangle-exclamation">
+    - Use try-catch for async operations
+    - Return appropriate status codes
+    - Provide meaningful error messages
+    - Log errors for debugging
+  </Accordion>
+
+  <Accordion title="Use Middleware Wisely" icon="filter">
+    - Apply global middleware at the top
+    - Use route-specific middleware for special cases
+    - Keep middleware focused and simple
+    - Order matters - apply in correct sequence
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Controllers" icon="code" href="/core-concepts/controllers">
+    Learn how to write controller functions
+  </Card>
+  <Card title="Views" icon="window" href="/building/views">
+    Render HTML templates
+  </Card>
+</CardGroup>

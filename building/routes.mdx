@@ -1,0 +1,77 @@
+---
+title: 'Routes'
+description: 'Create routes with authentication and middleware'
+---
+
+See the [Routing System](/core-concepts/routing-system) guide for complete details.
+
+## Quick Reference
+
+<CodeGroup>
+```javascript Public Route
+router.public('get', '/products', controller.list);
+```
+
+```javascript Member Route
+router.member('get', '/my-orders', controller.myOrders);
+```
+
+```javascript Admin Route
+router.admin('put', '/settings', controller.updateSettings);
+```
+</CodeGroup>
+
+## Route Types
+
+<CardGroup cols={3}>
+  <Card title="Public" icon="globe">
+    No authentication required
+  </Card>
+  <Card title="Member" icon="user">
+    Logged-in members only
+  </Card>
+  <Card title="Admin" icon="shield">
+    Admin users only
+  </Card>
+</CardGroup>
+
+## Middleware
+
+```javascript routes.js
+const bodyParser = require('body-parser');
+const router = new PluginRouter('shop');
+const expressRouter = router.getExpressRouter();
+
+// Global middleware
+expressRouter.use(bodyParser.json());
+expressRouter.use(customMiddleware);
+
+// Route-specific
+router.public('post', '/api/action', validateMiddleware, controller.action);
+```
+
+## Parameters
+
+```javascript
+// Path parameters
+router.public('get', '/products/:slug', (req, res) => {
+    const slug = req.params.slug;
+});
+
+// Query parameters
+router.public('get', '/search', (req, res) => {
+    const {q, page} = req.query;
+    // URL: /shop/search?q=laptop&page=2
+});
+
+// Request body
+router.public('post', '/api/cart/add', (req, res) => {
+    const {productId, quantity} = req.body;
+});
+```
+
+## Next Steps
+
+<Card title="Complete Routing Guide" href="/core-concepts/routing-system">
+  See the full routing documentation
+</Card>

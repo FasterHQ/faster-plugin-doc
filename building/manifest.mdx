@@ -1,0 +1,153 @@
+---
+title: 'Manifest Configuration'
+description: 'Configure your plugin with manifest.json'
+---
+
+## Overview
+
+The `manifest.json` file defines your plugin's metadata, permissions, routing, and default settings.
+
+## Complete Example
+
+```json manifest.json
+{
+  "name": "My Plugin",
+  "package_name": "my-plugin",
+  "version": "1.0.0",
+  "description": "Description of what your plugin does",
+  "author": "Your Name",
+  "homepage": "https://yoursite.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/username/my-plugin.git"
+  },
+  "keywords": ["keyword1", "keyword2", "keyword3"],
+  "license": "MIT",
+  "routing": "myplugin",
+  "permissions": [
+    "admin",
+    "members",
+    "database"
+  ],
+  "settings": {
+    "feature_enabled": true,
+    "max_items": 100,
+    "api_key": ""
+  }
+}
+```
+
+## Required Fields
+
+<ParamField path="name" type="string" required>
+  Display name of your plugin
+</ParamField>
+
+<ParamField path="package_name" type="string" required>
+  Unique identifier (kebab-case)
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  Semantic version (e.g., "1.0.0")
+</ParamField>
+
+## Optional Fields
+
+<ParamField path="routing" type="string">
+  URL prefix for all routes (e.g., "myplugin" → `/myplugin/*`)
+</ParamField>
+
+<ParamField path="description" type="string">
+  Brief description of what your plugin does
+</ParamField>
+
+<ParamField path="author" type="string">
+  Plugin author name
+</ParamField>
+
+<ParamField path="homepage" type="string">
+  Plugin homepage URL
+</ParamField>
+
+<ParamField path="repository" type="object">
+  Repository information with `type` and `url` fields
+</ParamField>
+
+<ParamField path="keywords" type="array">
+  Keywords for plugin discovery
+</ParamField>
+
+<ParamField path="license" type="string">
+  License type (e.g., "MIT", "GPL-3.0", "Apache-2.0")
+</ParamField>
+
+<ParamField path="permissions" type="array">
+  Required permissions: `admin`, `members`, `database`
+</ParamField>
+
+<ParamField path="settings" type="object">
+  Default plugin settings (can be changed at runtime)
+</ParamField>
+
+## Routing
+
+The `routing` field determines your URL structure:
+
+```json
+{
+  "routing": "myplugin"
+}
+```
+
+All routes become:
+- `/myplugin/` → index
+- `/myplugin/items` → items list
+- `/myplugin/api/action` → API endpoint
+
+## Permissions
+
+<AccordionGroup>
+  <Accordion title="admin" icon="shield">
+    Access to admin routes and settings
+  </Accordion>
+  
+  <Accordion title="members" icon="users">
+    Access to member authentication system
+  </Accordion>
+  
+  <Accordion title="database" icon="database">
+    Permission to create and modify database tables
+  </Accordion>
+</AccordionGroup>
+
+## Settings
+
+Default settings that can be modified:
+
+```json
+{
+  "settings": {
+    "feature_enabled": true,
+    "max_items": 100,
+    "api_key": "",
+    "nested_config": {
+      "option_one": "value",
+      "option_two": false
+    }
+  }
+}
+```
+
+<Warning>
+  Always use snake_case for setting names (e.g., `max_items`, not `maxItems`)
+</Warning>
+
+<Note>
+  Settings can be validated in your plugin class using `_validateSettings()`
+</Note>
+
+## Next Steps
+
+<Card title="Plugin Class" href="/building/plugin-class">
+  Create your plugin class
+</Card>
