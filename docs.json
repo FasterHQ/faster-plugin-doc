@@ -3,10 +3,10 @@
   "name": "Faster CMS Plugin Development",
   "theme": "mint",
   "logo": {
-    "dark": "/logo/dark.svg",
-    "light": "/logo/light.svg"
+    "light": "/faster-logo.png",
+    "dark": "/faster-logo.png"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/faster-logo.png",
   "colors": {
     "primary": "#0D9373",
     "light": "#07C983",
@@ -78,6 +78,7 @@
           "building/controllers",
           "building/services",
           "building/views",
+          "building/notifications",
           "building/admin-panel"
         ]
       },

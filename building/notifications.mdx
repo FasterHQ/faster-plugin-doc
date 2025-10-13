@@ -1,0 +1,718 @@
+---
+title: 'Notifications'
+description: 'Send email notifications to users from your plugin'
+---
+
+## Overview
+
+The Faster CMS notification system allows plugins to send email notifications to users. It provides a clean, object-oriented API for creating and sending templated emails with full Handlebars template support.
+
+## Key Features
+
+- Object-oriented notification classes
+- Handlebars template support
+- Automatic email rendering
+- Support for custom template paths
+- Type-safe data passing
+- Flexible data formatting
+
+## Basic Usage
+
+### Creating a Notification Class
+
+Notifications extend the base `Notification` class and implement the `toMail()` method:
+
+```javascript
+const {Notification} = require('../../../../core/server/services/plugin-notifications');
+
+class AccountVerificationNotification extends Notification {
+    constructor(user) {
+        super();
+        this.user = user;
+    }
+
+    /**
+     * Build the mail representation of the notification
+     *
+     * @param {Object} notifiable - The recipient receiving the notification
+     * @returns {Object} Mail configuration
+     */
+    toMail(notifiable) {
+        return {
+            subject: `Please verify your account`,
+            template: 'account-verification',
+            data: {
+                user: {
+                    name: this.user.name,
+                    email: this.user.email,
+                    verificationToken: this.user.verification_token
+                },
+                verificationUrl: this._getVerificationUrl()
+            }
+        };
+    }
+
+    _getVerificationUrl() {
+        return `/verify?token=${this.user.verification_token}`;
+    }
+
+    /**
+     * Override template path to look in notifications directory
+     */
+    getTemplatePath() {
+        const path = require('path');
+        return path.join(__dirname);
+    }
+}
+
+module.exports = AccountVerificationNotification;
+```
+
+### Sending Notifications
+
+To send a notification, instantiate your notification class and call the `send()` method:
+
+```javascript
+// In your controller or service
+const AccountVerificationNotification = require('../notifications/AccountVerificationNotification');
+
+// Create and send notification
+const notification = new AccountVerificationNotification(user);
+await notification.send(user.email);
+```
+
+### Error Handling
+
+It's recommended to wrap notification sending in try-catch blocks so that email failures don't break your application flow:
+
+```javascript
+try {
+    const notification = new AccountVerificationNotification(user);
+    await notification.send(user.email);
+    logging.info(`Verification email sent to ${user.email}`);
+} catch (emailError) {
+    logging.error('Error sending verification email:', emailError);
+    // Continue with user creation even if email fails
+}
+```
+
+## Email Templates
+
+### Template Structure
+
+Notification templates are Handlebars (.hbs) files stored in your plugin's `notifications/` directory. They have access to:
+
+- `data` object passed from `toMail()` method
+- `site` object with site information (`title`, `url`, `adminUrl`)
+- `recipient` object with recipient information
+- Standard Handlebars features (conditionals, loops, etc.)
+
+### Template Example
+
+```handlebars
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* Your email styles here */
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        .header {
+            background-color: #96588a;
+            color: #ffffff;
+            padding: 36px 48px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #96588a;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Welcome to {{site.title}}</h1>
+        </div>
+
+        <div class="content">
+            <p>Hi {{user.name}},</p>
+
+            <p>Thank you for joining us!</p>
+
+            <h2>Get Started</h2>
+            <p>Here are some features you can explore:</p>
+
+            <ul>
+                {{#each features}}
+                <li>{{this}}</li>
+                {{/each}}
+            </ul>
+
+            <p style="margin-top: 30px;">
+                <a href="{{actionUrl}}" class="button">Get Started →</a>
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>{{site.title}} - <a href="{{site.url}}">{{site.url}}</a></p>
+        </div>
+    </div>
+</body>
+</html>
+```
+
+### Available Handlebars Features
+
+The notification system supports standard Handlebars features plus custom helpers.
+
+#### Built-in Helpers
+
+See the [API Reference](#built-in-handlebars-helpers) section below for details on:
+- `formatDate` - Format dates
+- `formatCurrency` - Format currency values
+- `eq` - Compare values for equality
+
+#### Conditional Rendering
+
+Use standard Handlebars conditionals:
+
+```handlebars
+{{#if user.phone}}
+<p>Phone: {{user.phone}}</p>
+{{/if}}
+
+{{#if subscription.isPremium}}
+<div class="premium-badge">
+    <strong>Premium Member</strong>
+</div>
+{{/if}}
+```
+
+#### Loops
+
+Iterate over arrays:
+
+```handlebars
+{{#each features}}
+<li>
+    <strong>{{this.name}}</strong>
+    <p>{{this.description}}</p>
+</li>
+{{/each}}
+```
+
+## Advanced Example
+
+Here's a more complex notification with data formatting and custom methods:
+
+```javascript
+// notifications/WelcomeNotification.js
+const {Notification} = require('../../../../core/server/services/plugin-notifications');
+
+class WelcomeNotification extends Notification {
+    constructor(user, additionalData) {
+        super();
+        this.user = user;
+        this.additionalData = additionalData;
+    }
+
+    toMail(notifiable) {
+        return {
+            subject: `Welcome to ${this.additionalData.siteName}!`,
+            template: 'welcome',
+            data: {
+                user: {
+                    name: this.user.name,
+                    email: this.user.email,
+                    joinedDate: this.user.created_at
+                },
+                features: this.additionalData.features || [],
+                actionUrl: this._getActionUrl()
+            }
+        };
+    }
+
+    _getActionUrl() {
+        return `${this.additionalData.siteUrl}/get-started`;
+    }
+
+    getTemplatePath() {
+        const path = require('path');
+        return path.join(__dirname);
+    }
+}
+
+module.exports = WelcomeNotification;
+```
+
+### Usage Example
+
+```javascript
+// In your controller or service
+const WelcomeNotification = require('../notifications/WelcomeNotification');
+
+async function registerUser(req, res) {
+    try {
+        // Create user logic
+        const user = await userService.create(req.body);
+
+        // Send welcome notification
+        try {
+            const notification = new WelcomeNotification(user, {
+                siteName: 'My Site',
+                siteUrl: 'https://mysite.com',
+                features: ['Feature 1', 'Feature 2', 'Feature 3']
+            });
+            await notification.send(user.email);
+            logging.info(`Welcome email sent to ${user.email}`);
+        } catch (emailError) {
+            logging.error('Error sending welcome email:', emailError);
+            // Continue with user registration even if email fails
+        }
+
+        return res.status(201).json({
+            success: true,
+            user: user
+        });
+    } catch (error) {
+        logging.error('Error in registration:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Registration failed'
+        });
+    }
+}
+```
+
+## Best Practices
+
+### 1. Always Handle Errors
+
+Email delivery can fail for many reasons. Always wrap notification sending in try-catch blocks:
+
+```javascript
+try {
+    await notification.send(email);
+} catch (error) {
+    logging.error('Notification failed:', error);
+    // Continue with your application flow
+}
+```
+
+### 2. Don't Block Critical Operations
+
+Send notifications after completing critical operations (like saving to database), not before:
+
+```javascript
+// GOOD: Save first, then notify
+const user = await createUser(userData);
+await sendWelcomeNotification(user);
+
+// BAD: Don't let email failures prevent user creation
+await sendWelcomeNotification(userData); // If this fails, user won't be created
+const user = await createUser(userData);
+```
+
+### 3. Use Descriptive Email Subjects
+
+Make email subjects clear and actionable:
+
+```javascript
+// GOOD
+subject: `Welcome to ${siteName}, ${user.name}!`
+subject: `Action Required: Verify Your Account`
+
+// BAD
+subject: 'Notification'
+subject: 'Update'
+```
+
+### 4. Keep Templates Responsive
+
+Use responsive email design patterns:
+
+```css
+.email-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+@media only screen and (max-width: 600px) {
+    .address-column {
+        display: block !important;
+        width: 100% !important;
+    }
+}
+```
+
+### 5. Test Your Emails
+
+Test emails with various email clients (Gmail, Outlook, Apple Mail) to ensure compatibility.
+
+### 6. Include Unsubscribe Links
+
+For marketing emails, always include an unsubscribe option:
+
+```handlebars
+<div class="footer">
+    <p><a href="{{recipient.unsubscribeUrl}}">Unsubscribe from these emails</a></p>
+</div>
+```
+
+## File Structure
+
+Organize notifications in a dedicated directory:
+
+```
+your-plugin/
+├── notifications/
+│   ├── WelcomeNotification.js
+│   ├── AlertNotification.js
+│   ├── welcome.hbs
+│   └── alert.hbs
+├── controllers/
+├── services/
+└── manifest.json
+```
+
+## Troubleshooting
+
+### Emails Not Sending
+
+1. Check that your Faster CMS instance has email configured correctly
+2. Verify the recipient email address is valid
+3. Check logs for error messages
+4. Ensure your notification class extends `Notification` correctly
+
+### Template Not Found
+
+1. Verify the template name matches the filename (without .hbs)
+2. Ensure `getTemplatePath()` returns the correct directory
+3. Check file permissions on the template file
+
+### Data Not Appearing in Template
+
+1. Verify data is passed in the `data` object from `toMail()`
+2. Check Handlebars syntax in template
+3. Ensure variable names match between class and template
+
+## API Reference
+
+### Notification Class
+
+The base `Notification` class provides the following methods:
+
+#### `send(notifiables)`
+
+Send the notification to one or more recipients.
+
+**Parameters:**
+- `notifiables` (string|Object|Array) - Email address, user object, user ID, or array of any of these
+
+**Returns:** `Promise<Array>` - Results of notification sending
+
+**Example:**
+```javascript
+const notification = new MyNotification(data);
+
+// Send to single email
+await notification.send('user@example.com');
+
+// Send to multiple recipients
+await notification.send(['user1@example.com', 'user2@example.com']);
+
+// Send to user object
+await notification.send({ email: 'user@example.com', name: 'John' });
+```
+
+#### `toMail(notifiable)`
+
+Build the mail representation of the notification. **Must be implemented by subclasses.**
+
+**Parameters:**
+- `notifiable` (Object) - The recipient object with email, name, etc.
+
+**Returns:** `Object` or `MailMessage` - Mail configuration
+
+**Return Object Structure:**
+```javascript
+{
+    subject: 'Email Subject',           // Required
+    template: 'template-name',          // Template name (without .hbs)
+    data: {                             // Data to pass to template
+        // Your custom data here
+    },
+    from: 'sender@example.com',         // Optional
+    replyTo: 'reply@example.com',       // Optional
+    cc: ['user@example.com'],           // Optional
+    bcc: ['bcc@example.com']            // Optional
+}
+```
+
+#### `getTemplatePath()`
+
+Get the directory path where templates are stored. Override this method to customize template location.
+
+**Returns:** `string` - Absolute path to templates directory
+
+**Default Behavior:**
+- Looks for templates in the same directory as the notification class
+- Falls back to a `templates` subdirectory
+
+**Example:**
+```javascript
+getTemplatePath() {
+    const path = require('path');
+    return path.join(__dirname, '..', 'email-templates');
+}
+```
+
+#### `getHtmlTemplatePath(templateName)`
+
+Get the full path to the HTML template file.
+
+**Parameters:**
+- `templateName` (string) - Template name from `toMail()`
+
+**Returns:** `string` - Full path to `.hbs` file
+
+#### `getTextTemplatePath(templateName)`
+
+Get the full path to the text template file.
+
+**Parameters:**
+- `templateName` (string) - Template name from `toMail()`
+
+**Returns:** `string` - Full path to `.txt.js` file
+
+#### `getPluginName()`
+
+Get the plugin name. Auto-detected from file path or can be overridden.
+
+**Returns:** `string` - Plugin name
+
+#### `getMeta()`
+
+Get notification metadata.
+
+**Returns:** `Object` - Metadata with id, type, and plugin name
+
+### MailMessage Builder
+
+The `MailMessage` class provides a fluent interface for building notifications without templates. Import it alongside `Notification`:
+
+```javascript
+const {Notification, MailMessage} = require('../../../../core/server/services/plugin-notifications');
+```
+
+#### Creating a MailMessage
+
+```javascript
+toMail(notifiable) {
+    return new MailMessage()
+        .subject('Welcome to Our Platform')
+        .greeting(`Hello ${notifiable.name}`)
+        .line('Thank you for joining us!')
+        .line('Here are some things you can do:')
+        .action('Get Started', 'https://example.com/get-started')
+        .lineAfter('If you have questions, feel free to reach out.')
+        .salutation('Best regards');
+}
+```
+
+#### Builder Methods
+
+**`subject(subject)`**
+- Set the email subject
+- **Parameters:** `subject` (string)
+- **Returns:** `this` (chainable)
+
+**`from(address)`**
+- Set the from email address
+- **Parameters:** `address` (string)
+- **Returns:** `this` (chainable)
+
+**`replyTo(address)`**
+- Set the reply-to email address
+- **Parameters:** `address` (string)
+- **Returns:** `this` (chainable)
+
+**`cc(addresses)`**
+- Add CC recipients
+- **Parameters:** `addresses` (string|string[])
+- **Returns:** `this` (chainable)
+
+**`bcc(addresses)`**
+- Add BCC recipients
+- **Parameters:** `addresses` (string|string[])
+- **Returns:** `this` (chainable)
+
+**`greeting(greeting)`**
+- Set the email greeting
+- **Parameters:** `greeting` (string)
+- **Returns:** `this` (chainable)
+- **Example:** `greeting('Hello John')`
+
+**`salutation(salutation)`**
+- Set the email closing salutation
+- **Parameters:** `salutation` (string)
+- **Returns:** `this` (chainable)
+- **Default:** `'Regards'`
+
+**`line(line)`**
+- Add a line of text before the action button
+- **Parameters:** `line` (string)
+- **Returns:** `this` (chainable)
+
+**`lines(lines)`**
+- Add multiple lines of text
+- **Parameters:** `lines` (string[])
+- **Returns:** `this` (chainable)
+
+**`lineAfter(line)`**
+- Add a line of text after the action button
+- **Parameters:** `line` (string)
+- **Returns:** `this` (chainable)
+
+**`action(text, url)`**
+- Add a call-to-action button
+- **Parameters:**
+  - `text` (string) - Button text
+  - `url` (string) - Button URL
+- **Returns:** `this` (chainable)
+
+**`level(level)`**
+- Set the notification level (affects button color)
+- **Parameters:** `level` (string) - `'info'`, `'success'`, or `'error'`
+- **Returns:** `this` (chainable)
+
+**`success()`**
+- Mark notification as success (green button)
+- **Returns:** `this` (chainable)
+
+**`error()`**
+- Mark notification as error (red button)
+- **Returns:** `this` (chainable)
+
+**`template(templateName, data)`**
+- Use a custom template instead of default layout
+- **Parameters:**
+  - `templateName` (string) - Template name without extension
+  - `data` (Object) - Data to pass to template
+- **Returns:** `this` (chainable)
+
+**`markdown(markdown)`**
+- Use markdown content
+- **Parameters:** `markdown` (string)
+- **Returns:** `this` (chainable)
+
+### Built-in Handlebars Helpers
+
+The notification system provides these Handlebars helpers:
+
+#### `formatDate`
+
+Format dates in templates.
+
+**Usage:**
+```handlebars
+{{formatDate date format}}
+```
+
+**Parameters:**
+- `date` - Date object or string
+- `format` - Moment.js format string (default: `'D MMM YYYY'`)
+
+**Examples:**
+```handlebars
+{{formatDate user.createdAt 'MMMM D, YYYY'}}
+<!-- Output: October 13, 2025 -->
+
+{{formatDate event.startTime 'MMM D, h:mm A'}}
+<!-- Output: Oct 13, 2:30 PM -->
+```
+
+#### `formatCurrency`
+
+Format currency values in templates.
+
+**Usage:**
+```handlebars
+{{formatCurrency amount currency}}
+```
+
+**Parameters:**
+- `amount` - Numeric amount
+- `currency` - Currency code (default: `'USD'`)
+
+**Examples:**
+```handlebars
+{{formatCurrency 49.99 'USD'}}
+<!-- Output: $49.99 -->
+
+{{formatCurrency 1234.56 'EUR'}}
+<!-- Output: €1,234.56 -->
+```
+
+#### `eq`
+
+Compare two values for equality.
+
+**Usage:**
+```handlebars
+{{#eq value1 value2}}
+    <!-- Content when equal -->
+{{else}}
+    <!-- Content when not equal -->
+{{/eq}}
+```
+
+**Example:**
+```handlebars
+{{#eq user.status 'active'}}
+    <span class="badge-active">Active</span>
+{{else}}
+    <span class="badge-inactive">Inactive</span>
+{{/eq}}
+```
+
+### Template Data
+
+Templates automatically receive the following data:
+
+#### `recipient`
+- `recipient.email` - Recipient's email address
+- `recipient.name` - Recipient's name
+- `recipient.id` - Recipient's ID (if available)
+- `recipient.staffUrl` - Link to staff settings (if applicable)
+
+#### `site`
+- `site.title` - Site title
+- `site.url` - Site URL
+- `site.domain` - Site domain
+- `site.accentColor` - Site accent color
+- `site.adminUrl` - Admin panel URL
+
+#### `fromEmail`
+- Default from email address
+
+#### `timestamp`
+- Current date/time when notification is sent
+
+#### Custom Data
+All data passed in the `data` object from `toMail()` is merged with the above.
+
+## Next Steps
+
+- Learn about [Services](/building/services) to organize notification logic
+- Explore [Controllers](/building/controllers) to trigger notifications from API endpoints
+- Check out [Views](/building/views) to create custom email templates
