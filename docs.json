@@ -77,6 +77,7 @@
           "building/migrations",
           "building/controllers",
           "building/services",
+          "building/cron-jobs",
           "building/views",
           "building/notifications",
           "building/admin-panel"
