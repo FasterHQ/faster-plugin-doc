@@ -711,13 +711,15 @@ import ImageSelectionModal from 'ImageSelectionModal';
 // @ts-expect-error
 import CustomContractModal from 'CustomContractModal';
 // @ts-expect-error
+import GeoLocationPicker from 'GeoLocationPicker';
+// @ts-expect-error
 import ImageUploadWidgetCore from 'ImageUploadWidgetCore';
 // @ts-expect-error
 import MediaGalleryWidget from 'MediaGalleryWidget';
 ```
 
 <Info>
-  See the [Host-Provided Components](#host-provided-components) section below for detailed documentation on using specialized Faster components like `ImageSelectionModal` and `CustomContractModal`.
+  See the [Host-Provided Components](#host-provided-components) section below for detailed documentation on using specialized Faster components like `ImageSelectionModal`, `CustomContractModal`, and `GeoLocationPicker`.
 </Info>
 
 ### Listing Component
@@ -1220,6 +1222,128 @@ In addition to standard Ant Design components, Faster provides specialized compo
     // @ts-expect-error - Provided by host app
     import MediaGalleryWidget from 'MediaGalleryWidget';
     ```
+  </Accordion>
+
+  <Accordion title="GeoLocationPicker" icon="map-marker-alt">
+    An interactive Google Maps-based location picker for selecting geographic coordinates and addresses.
+
+    **Import:**
+    ```typescript
+    // @ts-expect-error - Provided by host app
+    import GeoLocationPicker from 'GeoLocationPicker';
+    ```
+
+    **Usage:**
+    ```typescript
+    const [locationModalVisible, setLocationModalVisible] = useState(false);
+    const [form] = Form.useForm();
+
+    <GeoLocationPicker
+      onLocationSelect={(locationData: any) => {
+        form.setFieldsValue({
+          location: locationData.address,
+          lat: locationData.lat.toFixed(6),
+          long: locationData.lng.toFixed(6),
+        });
+        setLocationModalVisible(false);
+      }}
+      initialLocation={
+        form.getFieldValue('lat') && form.getFieldValue('long')
+          ? {
+              lat: parseFloat(form.getFieldValue('lat')),
+              lng: parseFloat(form.getFieldValue('long')),
+              address: form.getFieldValue('location') || '',
+            }
+          : undefined
+      }
+    />
+    ```
+
+    **Props:**
+    - `onLocationSelect(locationData)` - Callback when location is selected
+      - `locationData.address` - Full formatted address
+      - `locationData.lat` - Latitude coordinate
+      - `locationData.lng` - Longitude coordinate
+    - `initialLocation` - Optional initial location to display
+      - `lat` - Latitude
+      - `lng` - Longitude
+      - `address` - Address string
+
+    **Common Pattern - Location Input with Map Picker:**
+    ```typescript
+    import { Modal, Tooltip, Button } from 'antd';
+    import { EnvironmentOutlined } from '@ant-design/icons';
+
+    // State for modal
+    const [locationModalVisible, setLocationModalVisible] = useState(false);
+
+    // Location input field with map icon
+    <Form.Item name="location" label="Location">
+      <Input
+        placeholder="e.g., 123 Main St, City, State"
+        suffix={
+          <Tooltip title="Select Location on Map">
+            <Button
+              type="text"
+              size="small"
+              icon={<EnvironmentOutlined />}
+              onClick={() => setLocationModalVisible(true)}
+            />
+          </Tooltip>
+        }
+      />
+    </Form.Item>
+
+    // Hidden fields for coordinates
+    <Form.Item name="lat" hidden>
+      <Input />
+    </Form.Item>
+    <Form.Item name="long" hidden>
+      <Input />
+    </Form.Item>
+
+    // Modal with map picker
+    <Modal
+      title="Select Location"
+      open={locationModalVisible}
+      onCancel={() => setLocationModalVisible(false)}
+      footer={null}
+      width={900}
+      centered
+      destroyOnClose
+    >
+      <GeoLocationPicker
+        onLocationSelect={(locationData: any) => {
+          form.setFieldsValue({
+            location: locationData.address,
+            lat: locationData.lat.toFixed(6),
+            long: locationData.lng.toFixed(6),
+          });
+          setLocationModalVisible(false);
+        }}
+        initialLocation={
+          form.getFieldValue('lat') && form.getFieldValue('long')
+            ? {
+                lat: parseFloat(form.getFieldValue('lat')),
+                lng: parseFloat(form.getFieldValue('long')),
+                address: form.getFieldValue('location') || '',
+              }
+            : undefined
+        }
+      />
+    </Modal>
+    ```
+
+    **Requirements:**
+    - Google Maps API key must be configured in Faster frontend environment (`VITE_GOOGLE_MAPS_API_KEY`)
+    - If API key is not configured, component shows a helpful error message
+
+    **Best Practices:**
+    - Store both address and coordinates (lat/lng) for precise location data
+    - Use hidden form fields for lat/lng to avoid cluttering the UI
+    - Provide a clear icon/button to open the map picker
+    - Set appropriate modal width (900px recommended for map visibility)
+    - Use `destroyOnClose` to reset map state between uses
   </Accordion>
 </AccordionGroup>
 
