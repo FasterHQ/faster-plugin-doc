@@ -704,7 +704,21 @@ import { EditOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant
 
 // React (already available globally)
 import React from 'react';
+
+// Host-provided components (see "Host-Provided Components" section for details)
+// @ts-expect-error
+import ImageSelectionModal from 'ImageSelectionModal';
+// @ts-expect-error
+import CustomContractModal from 'CustomContractModal';
+// @ts-expect-error
+import ImageUploadWidgetCore from 'ImageUploadWidgetCore';
+// @ts-expect-error
+import MediaGalleryWidget from 'MediaGalleryWidget';
 ```
+
+<Info>
+  See the [Host-Provided Components](#host-provided-components) section below for detailed documentation on using specialized Faster components like `ImageSelectionModal` and `CustomContractModal`.
+</Info>
 
 ### Listing Component
 
@@ -1022,6 +1036,196 @@ When building custom admin UI, you have access to Ant Design components:
     - **Space** - Item spacing
   </Accordion>
 </AccordionGroup>
+
+### Host-Provided Components
+
+In addition to standard Ant Design components, Faster provides specialized components for enhanced functionality:
+
+<AccordionGroup>
+  <Accordion title="ImageSelectionModal" icon="image">
+    A rich media library modal for selecting images from the Faster media gallery.
+
+    **Import:**
+    ```typescript
+    // @ts-expect-error - Provided by host app
+    import ImageSelectionModal from 'ImageSelectionModal';
+    ```
+
+    **Usage:**
+    ```typescript
+    const [imageModalVisible, setImageModalVisible] = useState(false);
+    const [form] = Form.useForm();
+
+    <ImageSelectionModal
+      open={imageModalVisible}
+      onClose={() => setImageModalVisible(false)}
+      onSelect={(item: any) => {
+        if (item?.url) {
+          form.setFieldsValue({ image_url: item.url });
+        }
+        setImageModalVisible(false);
+      }}
+    />
+    ```
+
+    **Props:**
+    - `open` (boolean) - Controls modal visibility
+    - `onClose` (function) - Callback when modal is closed
+    - `onSelect` (function) - Callback when an image is selected, receives `item` with `url` property
+
+    **Example - Image Field with Preview:**
+    ```typescript
+    <Form.Item name="image_url" label="Service Image">
+      <Form.Item noStyle shouldUpdate>
+        {() => {
+          const imageUrl = form.getFieldValue('image_url');
+
+          return (
+            <div className="tw-space-y-3">
+              {imageUrl && (
+                <>
+                  <img
+                    src={imageUrl}
+                    alt="Preview"
+                    className="tw-w-full tw-h-32 tw-object-cover tw-rounded-md"
+                  />
+                  <div className="tw-grid tw-grid-cols-2 tw-gap-2">
+                    <Button onClick={() => setImageModalVisible(true)} block>
+                      Change
+                    </Button>
+                    <Button
+                      danger
+                      onClick={() => form.setFieldsValue({ image_url: null })}
+                      block
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </>
+              )}
+              {!imageUrl && (
+                <Button onClick={() => setImageModalVisible(true)} block size="large">
+                  Select Image
+                </Button>
+              )}
+            </div>
+          );
+        }}
+      </Form.Item>
+    </Form.Item>
+    ```
+  </Accordion>
+
+  <Accordion title="CustomContractModal" icon="file-text">
+    A TipTap/ProseMirror-based document editor for creating and managing contracts with e-signature support.
+
+    **Import:**
+    ```typescript
+    // @ts-expect-error - Provided by host app
+    import CustomContractModal from 'CustomContractModal';
+    ```
+
+    **Usage:**
+    ```typescript
+    const [contractModalVisible, setContractModalVisible] = useState(false);
+    const [useContract, setUseContract] = useState(false);
+    const [form] = Form.useForm();
+
+    <CustomContractModal
+      open={contractModalVisible}
+      onClose={() => setContractModalVisible(false)}
+      onSave={(contractJson: string) => {
+        form.setFieldsValue({ contract_agreement: contractJson });
+      }}
+      initialContract={form.getFieldValue('contract_agreement')}
+    />
+    ```
+
+    **Props:**
+    - `open` (boolean) - Controls modal visibility
+    - `onClose` (function) - Callback when modal is closed
+    - `onSave` (function) - Callback when contract is saved, receives contract as JSON string
+    - `initialContract` (string, optional) - Existing contract JSON to load in editor
+
+    **Example - Contract Field:**
+    ```typescript
+    <Form.Item
+      name="use_contract"
+      label="Require Custom Contract"
+      valuePropName="checked"
+    >
+      <Switch
+        checked={useContract}
+        onChange={(checked) => {
+          setUseContract(checked);
+          form.setFieldsValue({ use_contract: checked });
+        }}
+        checkedChildren="Yes"
+        unCheckedChildren="No"
+      />
+    </Form.Item>
+
+    {useContract && (
+      <Form.Item
+        name="contract_agreement"
+        label="Contract Agreement"
+      >
+        <Button
+          icon={<EditOutlined />}
+          onClick={() => setContractModalVisible(true)}
+          block
+          size="large"
+        >
+          {form.getFieldValue('contract_agreement')
+            ? 'Edit Contract'
+            : 'Create Contract'}
+        </Button>
+      </Form.Item>
+    )}
+    ```
+
+    **Features:**
+    - Full rich text editing with TipTap/ProseMirror
+    - E-signature field support
+    - Document templates
+    - Email notification integration
+    - Contract versioning
+  </Accordion>
+
+  <Accordion title="ImageUploadWidgetCore" icon="upload">
+    A basic image upload widget (legacy - consider using ImageSelectionModal for better UX).
+
+    **Import:**
+    ```typescript
+    // @ts-expect-error - Provided by host app
+    import ImageUploadWidgetCore from 'ImageUploadWidgetCore';
+    ```
+
+    **Usage:**
+    ```typescript
+    <ImageUploadWidgetCore
+      value={form.getFieldValue('image_url')}
+      onChange={(url: string) => {
+        form.setFieldsValue({ image_url: url });
+      }}
+    />
+    ```
+  </Accordion>
+
+  <Accordion title="MediaGalleryWidget" icon="folder">
+    Widget for browsing and selecting from the media gallery.
+
+    **Import:**
+    ```typescript
+    // @ts-expect-error - Provided by host app
+    import MediaGalleryWidget from 'MediaGalleryWidget';
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  **Important:** Host-provided components are exposed by Faster frontend and are available automatically when your custom admin UI is loaded. You don't need to install them as dependencies - just import them as shown above.
+</Note>
 
 ## API Access in Custom UI
 
