@@ -80,6 +80,7 @@
           "building/cron-jobs",
           "building/views",
           "building/notifications",
+          "building/global-search",
           "building/admin-panel"
         ]
       },

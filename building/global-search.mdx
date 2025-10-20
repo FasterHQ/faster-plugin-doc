@@ -1,0 +1,144 @@
+---
+title: 'Global Search'
+description: 'Enable your plugin resources to be searchable in the CMS global search'
+---
+
+## Overview
+
+The Faster CMS global search allows users to quickly find content across the entire CMS. By implementing the `Searchable` interface, your plugin can expose its resources (products, events, bookings, etc.) to the global search, making them instantly discoverable alongside posts, pages, and other content.
+
+<Info>
+Global search integration is automatic once you implement the `Searchable` class. The CMS handles indexing, registration, and search query processing.
+</Info>
+
+## Implementation
+
+### Step 1: Create a Searchable Class
+
+Create a file in your plugin at `search/YourResourceSearch.js`:
+
+```javascript
+const {Searchable} = require('@tryghost/plugin-sdk');
+const {Product} = require('../models');
+const manifest = require('../manifest.json');
+
+class ProductSearch extends Searchable {
+    config = {
+        resourceType: 'products',        // Unique identifier
+        displayName: 'Products',         // Shown in search results
+        icon: '🛍️',                      // Visual identifier
+        searchFields: ['name', 'description', 'sku']  // Fields to search
+    };
+
+    async fetch() {
+        const products = await Product.findAll({
+            filter: 'is_active:true',
+            columns: ['id', 'slug', 'name', 'description', 'featured_image']
+        });
+
+        const productsData = products.toJSON();
+        const baseUrl = manifest?.routing ?? 'shop';
+
+        return productsData.map(product => ({
+            id: product.id,
+            slug: product.slug,
+            name: product.name,
+            description: product.description,
+            image_url: product.featured_image,
+            url: `/${baseUrl}/products/${product.slug}`
+        }));
+    }
+}
+
+module.exports = ProductSearch;
+```
+
+### Step 2: Register in Your Plugin
+
+In your plugin's main `index.js`, implement `getSearchableResources()`:
+
+```javascript
+const {BasePlugin} = require('@tryghost/plugin-sdk');
+
+class MyPlugin extends BasePlugin {
+    constructor() {
+        super({
+            name: 'my-plugin',
+            version: '1.0.0',
+            pluginPath: __dirname
+        });
+    }
+
+    getSearchableResources() {
+        const ProductSearch = require('./search/ProductSearch');
+        return [
+            new ProductSearch(this)
+        ];
+    }
+}
+
+module.exports = new MyPlugin();
+```
+
+That's it! Your resources are now searchable in the CMS.
+
+## Configuration Options
+
+### config Object
+
+<ParamField path="resourceType" type="string" required>
+  Unique identifier for this resource type. Use lowercase, plural form (e.g., 'products', 'events').
+</ParamField>
+
+<ParamField path="displayName" type="string" required>
+  Human-readable name shown in search results. Use title case, plural form (e.g., 'Products', 'Events').
+</ParamField>
+
+<ParamField path="icon" type="string" default="📄">
+  Visual identifier for this resource type. Use emoji or icon name.
+</ParamField>
+
+<ParamField path="searchFields" type="string[]" required>
+  Array of field names to search within. Must match the keys returned from `fetch()`.
+</ParamField>
+
+### fetch() Method
+
+The `fetch()` method must return an array of objects with these required fields:
+
+```javascript
+{
+    id: 'unique-id',           // Required: Unique identifier
+    slug: 'url-slug',          // Required: URL-friendly identifier
+    url: '/path/to/resource',  // Required: Full URL for navigation
+    // ... all fields listed in searchFields
+    // ... any optional metadata (image_url, price, etc.)
+}
+```
+
+## Multiple Resource Types
+
+You can make multiple resource types searchable from a single plugin:
+
+```javascript
+getSearchableResources() {
+    const ProductSearch = require('./search/ProductSearch');
+    const CategorySearch = require('./search/CategorySearch');
+
+    return [
+        new ProductSearch(this),
+        new CategorySearch(this)
+    ];
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Models" icon="database" href="/core-concepts/models">
+    Learn how to define models for your searchable data
+  </Card>
+  <Card title="Routes" icon="route" href="/building/routes">
+    Create routes for your search result URLs
+  </Card>
+</CardGroup>
