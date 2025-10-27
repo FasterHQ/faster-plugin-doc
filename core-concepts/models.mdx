@@ -728,7 +728,7 @@ for (const item of items.models) {
 For complex queries, use the underlying Knex connection:
 
 ```javascript
-const db = require('@tryghost/database').getConnection();
+const db = require('@fasterhq/database').getConnection();
 
 const items = await db('mp_items')
     .join('mp_categories', 'mp_items.category_id', 'mp_categories.id')
@@ -775,7 +775,7 @@ async function createItemWithAttachments(itemData, attachmentUrls) {
 Listen to model changes:
 
 ```javascript
-const events = require('@tryghost/events');
+const events = require('@fasterhq/events');
 
 // Listen for item creation
 events.on('item.added', async (model) => {

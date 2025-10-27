@@ -45,7 +45,7 @@ cd my-plugin
 
   <Step title="index.js">
     ```javascript
-    const {BasePlugin} = require('@tryghost/plugin-sdk');
+    const {BasePlugin} = require('@fasterhq/plugin-sdk');
 
     class MyPlugin extends BasePlugin {
         constructor() {
@@ -63,7 +63,7 @@ cd my-plugin
 
   <Step title="routes.js">
     ```javascript
-    const {PluginRouter} = require('@tryghost/plugin-sdk');
+    const {PluginRouter} = require('@fasterhq/plugin-sdk');
     const router = new PluginRouter('myplugin');
 
     router.public('get', '/', (req, res) => {

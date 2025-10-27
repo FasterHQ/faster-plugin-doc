@@ -14,7 +14,7 @@ Faster CMS provides a unified Job class for creating scheduled tasks (cron jobs)
 Create a job file in your plugin's `jobs/` directory:
 
 ```javascript jobs/MyJob.js
-const {Job} = require('@tryghost/plugin-sdk');
+const {Job} = require('@fasterhq/plugin-sdk');
 
 class MyJob extends Job {
     static config = {
@@ -256,7 +256,7 @@ async handle() {
 Here's a complete example of a data cleanup job:
 
 ```javascript jobs/DataCleanupJob.js
-const {Job} = require('@tryghost/plugin-sdk');
+const {Job} = require('@fasterhq/plugin-sdk');
 const {Record} = require('../models/record');
 
 class DataCleanupJob extends Job {

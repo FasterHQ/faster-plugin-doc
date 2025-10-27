@@ -18,7 +18,7 @@ Global search integration is automatic once you implement the `Searchable` class
 Create a file in your plugin at `search/YourResourceSearch.js`:
 
 ```javascript
-const {Searchable} = require('@tryghost/plugin-sdk');
+const {Searchable} = require('@fasterhq/plugin-sdk');
 const {Product} = require('../models');
 const manifest = require('../manifest.json');
 
@@ -58,7 +58,7 @@ module.exports = ProductSearch;
 In your plugin's main `index.js`, implement `getSearchableResources()`:
 
 ```javascript
-const {BasePlugin} = require('@tryghost/plugin-sdk');
+const {BasePlugin} = require('@fasterhq/plugin-sdk');
 
 class MyPlugin extends BasePlugin {
     constructor() {

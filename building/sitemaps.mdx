@@ -1,0 +1,556 @@
+---
+title: 'Sitemaps'
+description: 'Generate XML sitemaps for your plugin content to improve SEO'
+---
+
+## Overview
+
+Sitemaps help search engines discover and index your plugin's content. Faster CMS provides a sitemap registry that allows plugins to register their sitemap URLs, which are then included in the main sitemap index.
+
+<Info>
+  Plugin sitemaps are automatically included in the CMS sitemap index at `/sitemap.xml`
+</Info>
+
+## Quick Start
+
+Implementing a sitemap requires three steps:
+
+1. **Create a sitemap controller** to generate XML
+2. **Define a sitemap route** in your routes file
+3. **Register the sitemap** in your plugin's `onInit()` hook
+
+## Step 1: Create Sitemap Controller
+
+Create a controller that generates sitemap XML:
+
+```javascript controllers/sitemap.js
+const moment = require('moment');
+const urlUtils = require('../../../../core/shared/url-utils');
+const {Item} = require('../models');
+
+/**
+ * Generate items sitemap XML
+ */
+async function itemsSitemap(req, res) {
+    try {
+        const baseUrl = urlUtils.getSiteUrl();
+
+        // Fetch all active items from database
+        const itemsResult = await Item.findAll({
+            filter: 'is_active:true+deleted_at:null'
+        });
+
+        const items = itemsResult ? itemsResult.toJSON() : [];
+
+        // Build sitemap URL entries
+        const urls = items.map(item => {
+            const url = `${baseUrl}myplugin/items/${item.slug}`;
+            return `
+    <url>
+        <loc>${url}</loc>
+        <lastmod>${moment(item.updated_at).toISOString()}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>`;
+        }).join('');
+
+        // Generate XML
+        const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    ${urls}
+</urlset>`;
+
+        res.type('application/xml');
+        res.send(xml);
+    } catch (error) {
+        res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><error>Failed to generate sitemap</error>');
+    }
+}
+
+module.exports = {
+    itemsSitemap
+};
+```
+
+<Note>
+  Use `urlUtils.getSiteUrl()` to get the correct base URL for your site, including protocol and domain.
+</Note>
+
+## Step 2: Define Sitemap Route
+
+Add a public route for your sitemap in `routes.js`:
+
+```javascript routes.js
+const {PluginRouter} = require('@fasterhq/plugin-sdk');
+const sitemap = require('./controllers/sitemap');
+const manifest = require('./manifest.json');
+
+const router = new PluginRouter(manifest.routing || 'myplugin');
+
+// Define sitemap route
+router.public('get', '/sitemap-items.xml', sitemap.itemsSitemap);
+
+module.exports = {
+    router: function () {
+        return router.router();
+    }
+};
+```
+
+<Tip>
+  Use descriptive names like `/sitemap-items.xml` or `/sitemap-products.xml` instead of just `/sitemap.xml` to avoid conflicts.
+</Tip>
+
+## Step 3: Register with Sitemap Registry
+
+Register your sitemap in the plugin's `onInit()` hook:
+
+```javascript index.js
+const {BasePlugin} = require('@fasterhq/plugin-sdk');
+
+class MyPlugin extends BasePlugin {
+    constructor() {
+        super({
+            name: 'my-plugin',
+            version: '1.0.0',
+            pluginPath: __dirname
+        });
+    }
+
+    async onInit() {
+        this.debug('Initializing plugin');
+
+        // Register sitemap with the registry
+        try {
+            const pluginSitemapRegistry = require('../../../core/server/services/plugin-sitemap-registry');
+            pluginSitemapRegistry.register({
+                name: this.name,
+                sitemapUrl: 'myplugin/sitemap-items.xml',
+                lastModified: new Date()
+            });
+            this.debug('Sitemap registered successfully');
+        } catch (error) {
+            this.debug('Failed to register sitemap:', error.message);
+        }
+    }
+}
+
+module.exports = new MyPlugin();
+```
+
+<Warning>
+  The `sitemapUrl` should be relative to your site's root (e.g., `'myplugin/sitemap-items.xml'`), not an absolute URL.
+</Warning>
+
+## Sitemap Registry Options
+
+<ParamField path="name" type="string" required>
+  Your plugin name (typically `this.name`)
+</ParamField>
+
+<ParamField path="sitemapUrl" type="string" required>
+  Relative URL to your sitemap (e.g., `'myplugin/sitemap-items.xml'`)
+</ParamField>
+
+<ParamField path="lastModified" type="Date" required>
+  Last modification date for the sitemap
+</ParamField>
+
+## XML Sitemap Structure
+
+### Required Elements
+
+Every sitemap must include:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://example.com/page-url</loc>
+        <lastmod>2024-01-15T10:30:00.000Z</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+</urlset>
+```
+
+### URL Elements
+
+<ParamField path="loc" type="string" required>
+  Full URL of the page (must start with http:// or https://)
+</ParamField>
+
+<ParamField path="lastmod" type="ISO 8601 date" optional>
+  Last modification date in ISO 8601 format
+</ParamField>
+
+<ParamField path="changefreq" type="string" optional>
+  How frequently the page changes: `always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly`, `never`
+</ParamField>
+
+<ParamField path="priority" type="number" optional>
+  Priority from 0.0 to 1.0 (default: 0.5). Higher priority pages are crawled more frequently.
+</ParamField>
+
+## Multiple Sitemaps
+
+If you have multiple content types, create separate sitemaps:
+
+```javascript controllers/sitemap.js
+async function productsSitemap(req, res) {
+    // Generate products sitemap
+}
+
+async function categoriesSitemap(req, res) {
+    // Generate categories sitemap
+}
+
+module.exports = {
+    productsSitemap,
+    categoriesSitemap
+};
+```
+
+Register routes for each:
+
+```javascript routes.js
+router.public('get', '/sitemap-products.xml', sitemap.productsSitemap);
+router.public('get', '/sitemap-categories.xml', sitemap.categoriesSitemap);
+```
+
+Register each with the sitemap registry:
+
+```javascript index.js
+async onInit() {
+    const pluginSitemapRegistry = require('../../../core/server/services/plugin-sitemap-registry');
+
+    // Register products sitemap
+    pluginSitemapRegistry.register({
+        name: `${this.name}-products`,
+        sitemapUrl: 'myplugin/sitemap-products.xml',
+        lastModified: new Date()
+    });
+
+    // Register categories sitemap
+    pluginSitemapRegistry.register({
+        name: `${this.name}-categories`,
+        sitemapUrl: 'myplugin/sitemap-categories.xml',
+        lastModified: new Date()
+    });
+}
+```
+
+## Dynamic Content
+
+Generate sitemap content dynamically from your database:
+
+```javascript
+async function dynamicSitemap(req, res) {
+    try {
+        const baseUrl = urlUtils.getSiteUrl();
+
+        // Fetch items with filtering and sorting
+        const itemsResult = await Item.findAll({
+            filter: 'is_active:true+deleted_at:null',
+            columns: ['id', 'slug', 'updated_at', 'created_at']
+        });
+
+        const items = itemsResult ? itemsResult.toJSON() : [];
+
+        // Calculate priority based on recency
+        const urls = items.map(item => {
+            const daysSinceUpdate = moment().diff(moment(item.updated_at), 'days');
+            const priority = Math.max(0.5, 1.0 - (daysSinceUpdate / 365));
+
+            return `
+    <url>
+        <loc>${baseUrl}myplugin/items/${item.slug}</loc>
+        <lastmod>${moment(item.updated_at).toISOString()}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>${priority.toFixed(1)}</priority>
+    </url>`;
+        }).join('');
+
+        const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    ${urls}
+</urlset>`;
+
+        res.type('application/xml');
+        res.send(xml);
+    } catch (error) {
+        res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><error>Failed to generate sitemap</error>');
+    }
+}
+```
+
+## Change Frequency Guidelines
+
+<AccordionGroup>
+  <Accordion title="always" icon="rotate">
+    Use for content that changes with every access (e.g., real-time data, live feeds)
+  </Accordion>
+
+  <Accordion title="hourly" icon="clock">
+    Content updated multiple times per day (e.g., news sites, social feeds)
+  </Accordion>
+
+  <Accordion title="daily" icon="calendar-day">
+    Content updated daily (e.g., blog posts, daily deals)
+  </Accordion>
+
+  <Accordion title="weekly" icon="calendar-week">
+    Content updated weekly (e.g., products, articles)
+  </Accordion>
+
+  <Accordion title="monthly" icon="calendar">
+    Content updated monthly (e.g., documentation, policies)
+  </Accordion>
+
+  <Accordion title="yearly" icon="calendar-days">
+    Content updated rarely (e.g., about pages, terms of service)
+  </Accordion>
+
+  <Accordion title="never" icon="ban">
+    Archived content that will never change
+  </Accordion>
+</AccordionGroup>
+
+## Priority Guidelines
+
+<Note>
+  Priority is relative to other pages on your site, not across the web.
+</Note>
+
+| Priority | Use Case |
+|----------|----------|
+| **1.0** | Homepage, most important landing pages |
+| **0.8-0.9** | Key product/service pages, important content |
+| **0.6-0.7** | Regular content pages, blog posts |
+| **0.4-0.5** | Archive pages, tags, categories |
+| **0.1-0.3** | Utility pages, less important content |
+
+## Performance Optimization
+
+### Limit Sitemap Size
+
+Keep sitemaps under 50,000 URLs and 50MB:
+
+```javascript
+async function itemsSitemap(req, res) {
+    try {
+        const baseUrl = urlUtils.getSiteUrl();
+
+        // Limit to 50,000 items
+        const itemsResult = await Item.findPage({
+            filter: 'is_active:true+deleted_at:null',
+            limit: 50000,
+            order: 'updated_at DESC'
+        });
+
+        const items = itemsResult.data || [];
+
+        // Generate sitemap...
+    } catch (error) {
+        res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><error>Failed to generate sitemap</error>');
+    }
+}
+```
+
+### Cache Sitemap Output
+
+For large sitemaps, consider caching:
+
+```javascript
+let cachedSitemap = null;
+let cacheExpiry = null;
+
+async function itemsSitemap(req, res) {
+    const now = Date.now();
+
+    // Return cached sitemap if still valid (1 hour cache)
+    if (cachedSitemap && cacheExpiry && now < cacheExpiry) {
+        res.type('application/xml');
+        return res.send(cachedSitemap);
+    }
+
+    try {
+        // Generate sitemap...
+        const xml = `<?xml version="1.0" encoding="UTF-8"?>...`;
+
+        // Cache for 1 hour
+        cachedSitemap = xml;
+        cacheExpiry = now + (60 * 60 * 1000);
+
+        res.type('application/xml');
+        res.send(xml);
+    } catch (error) {
+        res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><error>Failed to generate sitemap</error>');
+    }
+}
+```
+
+## Error Handling
+
+Always handle errors gracefully:
+
+```javascript
+async function itemsSitemap(req, res) {
+    try {
+        const baseUrl = urlUtils.getSiteUrl();
+        const itemsResult = await Item.findAll({
+            filter: 'is_active:true+deleted_at:null'
+        });
+
+        const items = itemsResult ? itemsResult.toJSON() : [];
+
+        if (items.length === 0) {
+            // Return empty but valid sitemap
+            const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <!-- No items available -->
+</urlset>`;
+            res.type('application/xml');
+            return res.send(xml);
+        }
+
+        // Generate sitemap...
+    } catch (error) {
+        console.error('Sitemap generation error:', error);
+        res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><error>Failed to generate sitemap</error>');
+    }
+}
+```
+
+## Testing Your Sitemap
+
+### Manual Testing
+
+1. **Access directly**: Visit `https://yoursite.com/myplugin/sitemap-items.xml`
+2. **Check main sitemap**: Visit `https://yoursite.com/sitemap.xml` to verify your sitemap is included
+3. **Validate XML**: Use an XML validator to ensure proper syntax
+
+### Automated Testing
+
+```javascript
+// Test sitemap response
+const request = require('supertest');
+const app = require('../app');
+
+describe('Sitemap', () => {
+    it('should return valid XML', async () => {
+        const response = await request(app)
+            .get('/myplugin/sitemap-items.xml')
+            .expect(200)
+            .expect('Content-Type', /xml/);
+
+        expect(response.text).toContain('<?xml version="1.0" encoding="UTF-8"?>');
+        expect(response.text).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+    });
+
+    it('should include item URLs', async () => {
+        const response = await request(app)
+            .get('/myplugin/sitemap-items.xml');
+
+        expect(response.text).toContain('<loc>');
+        expect(response.text).toContain('<lastmod>');
+    });
+});
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Descriptive Filenames" icon="file">
+    - Name sitemaps descriptively: `sitemap-products.xml`, `sitemap-categories.xml`
+    - Avoid generic names like `sitemap.xml` that might conflict
+  </Accordion>
+
+  <Accordion title="Include Only Public Content" icon="eye">
+    - Only include publicly accessible URLs
+    - Filter out deleted, inactive, or private content
+    - Don't include admin routes or API endpoints
+  </Accordion>
+
+  <Accordion title="Keep URLs Canonical" icon="link">
+    - Use full absolute URLs with protocol and domain
+    - Ensure URLs match your canonical URL structure
+    - Don't include query parameters unless necessary
+  </Accordion>
+
+  <Accordion title="Update Last Modified Dates" icon="calendar-check">
+    - Use accurate `updated_at` timestamps from your database
+    - Keep sitemap registry `lastModified` up to date
+  </Accordion>
+
+  <Accordion title="Optimize Performance" icon="gauge">
+    - Limit database queries to necessary fields
+    - Cache sitemap output for frequently accessed sitemaps
+    - Use database indexes on filtered fields
+  </Accordion>
+
+  <Accordion title="Handle Errors Gracefully" icon="shield">
+    - Return valid XML even when errors occur
+    - Log errors for debugging
+    - Return empty sitemap rather than failing
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Sitemap Not Appearing in Main Sitemap Index
+
+**Problem**: Your sitemap isn't listed in `/sitemap.xml`
+
+**Solutions**:
+1. Verify registration in `onInit()` hook
+2. Check `sitemapUrl` is correct and relative
+3. Restart CMS to re-run `onInit()`
+4. Check logs for registration errors
+
+### Invalid XML Errors
+
+**Problem**: Sitemap returns XML parsing errors
+
+**Solutions**:
+1. Validate XML structure with an XML validator
+2. Escape special characters in URLs and content
+3. Ensure proper encoding (`<?xml version="1.0" encoding="UTF-8"?>`)
+4. Check for unclosed tags
+
+### Empty Sitemap
+
+**Problem**: Sitemap contains no URLs
+
+**Solutions**:
+1. Verify database query is returning results
+2. Check filter conditions aren't too restrictive
+3. Ensure items have `is_active:true` and no `deleted_at`
+4. Log the query results for debugging
+
+### Performance Issues
+
+**Problem**: Sitemap takes too long to generate
+
+**Solutions**:
+1. Limit the number of URLs (max 50,000)
+2. Only query necessary columns
+3. Implement caching
+4. Add database indexes on filtered fields
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Plugin Lifecycle" icon="rotate" href="/core-concepts/plugin-lifecycle">
+    Learn about onInit() and other lifecycle hooks
+  </Card>
+  <Card title="Routes" icon="route" href="/core-concepts/routing-system">
+    Define routes for your plugin
+  </Card>
+  <Card title="Controllers" icon="code" href="/building/controllers">
+    Create controllers to handle requests
+  </Card>
+  <Card title="Models" icon="database" href="/core-concepts/models">
+    Query data from your database
+  </Card>
+</CardGroup>

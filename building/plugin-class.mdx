@@ -5,11 +5,11 @@ description: 'Build your main plugin class with lifecycle hooks'
 
 ## BasePlugin Class
 
-All plugins extend the `BasePlugin` class from `@tryghost/plugin-sdk`.
+All plugins extend the `BasePlugin` class from `@fasterhq/plugin-sdk`.
 
 ```javascript index.js
-const {BasePlugin} = require('@tryghost/plugin-sdk');
-const errors = require('@tryghost/errors');
+const {BasePlugin} = require('@fasterhq/plugin-sdk');
+const errors = require('@fasterhq/errors');
 
 class MyPlugin extends BasePlugin {
     constructor() {

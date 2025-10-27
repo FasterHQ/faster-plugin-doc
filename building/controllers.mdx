@@ -34,7 +34,7 @@ Frontend controllers render HTML pages using the rendering service:
 
 ```javascript controllers/frontend.js
 const renderer = require('../../../../core/frontend/services/rendering');
-const logging = require('@tryghost/logging');
+const logging = require('@fasterhq/logging');
 const {Item} = require('../models');
 
 /**
@@ -147,7 +147,7 @@ module.exports = {
 API controllers return JSON responses:
 
 ```javascript controllers/api/items.js
-const logging = require('@tryghost/logging');
+const logging = require('@fasterhq/logging');
 const {Item} = require('../../models');
 
 /**
@@ -331,7 +331,7 @@ Generic controller for CRUD operations across multiple models:
 
 ```javascript controllers/data-management.js
 const {modelSchemas} = require('../schema/admin-schema.js');
-const logging = require('@tryghost/logging');
+const logging = require('@fasterhq/logging');
 const serviceFactory = require('../services/factory.js');
 
 const listRecords = async (req, res) => {
@@ -468,7 +468,7 @@ module.exports = {
 Controller for managing plugin settings:
 
 ```javascript controllers/settings.js
-const logging = require('@tryghost/logging');
+const logging = require('@fasterhq/logging');
 
 class SettingsController {
     constructor() {
@@ -790,7 +790,7 @@ async function listItems(req, res) {
     - Log errors with context
     - Use appropriate log levels
     - Don't log sensitive data
-    - Use `@tryghost/logging` module
+    - Use `@fasterhq/logging` module
   </Accordion>
 </AccordionGroup>
 
@@ -799,7 +799,7 @@ async function listItems(req, res) {
 Here's a complete controller with all patterns:
 
 ```javascript controllers/api/items.js
-const logging = require('@tryghost/logging');
+const logging = require('@fasterhq/logging');
 const {Item} = require('../../models');
 const itemService = require('../../services/item-service');
 

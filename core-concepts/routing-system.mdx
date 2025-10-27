@@ -5,12 +5,12 @@ description: 'Create routes with role-based authentication and middleware'
 
 ## Overview
 
-Faster CMS uses the PluginRouter from `@tryghost/plugin-sdk` to create routes with built-in authentication, middleware support, and automatic URL prefixing.
+Faster CMS uses the PluginRouter from `@fasterhq/plugin-sdk` to create routes with built-in authentication, middleware support, and automatic URL prefixing.
 
 ## Basic Setup
 
 ```javascript routes.js
-const {PluginRouter} = require('@tryghost/plugin-sdk');
+const {PluginRouter} = require('@fasterhq/plugin-sdk');
 const manifest = require('./manifest.json');
 
 // Create router with URL prefix from manifest
@@ -414,7 +414,7 @@ module.exports = rateLimitMiddleware;
 ### Logging Middleware
 
 ```javascript middleware/logger.js
-const logging = require('@tryghost/logging');
+const logging = require('@fasterhq/logging');
 
 function loggerMiddleware(req, res, next) {
     const start = Date.now();
@@ -429,6 +429,105 @@ function loggerMiddleware(req, res, next) {
 
 module.exports = loggerMiddleware;
 ```
+
+## Named Routes (Reverse Routing)
+
+Name your routes for easy URL generation in templates and JavaScript:
+
+```javascript
+router.public('get', '/', controller.index).as('home');
+router.public('get', '/products/:slug', controller.productDetail).as('products.show');
+router.public('get', '/cart', controller.cart).as('cart');
+router.member('get', '/checkout', controller.checkout).as('checkout');
+router.public('post', '/api/cart/add', cartApi.addToCart).as('api.cart.add');
+```
+
+### Using Named Routes in Handlebars Templates
+
+Use the `{{route}}` helper to generate URLs:
+
+<CodeGroup>
+```handlebars Basic Usage
+<a href="{{route 'home'}}">Home</a>
+<a href="{{route 'cart'}}">View Cart</a>
+<a href="{{route 'checkout'}}">Checkout</a>
+```
+
+```handlebars With Parameters
+<!-- For route: /products/:slug -->
+<a href="{{route 'products.show' slug=product.slug}}">
+    {{product.name}}
+</a>
+
+<!-- For route: /orders/:orderId -->
+<a href="{{route 'orders.show' orderId=order.id}}">
+    Order #{{order.number}}
+</a>
+```
+
+```handlebars Multiple Parameters
+<!-- For route: /categories/:categoryId/products/:productId -->
+<a href="{{route 'products.detail' categoryId=category.id productId=product.id}}">
+    View Product
+</a>
+```
+</CodeGroup>
+
+### Using Named Routes in JavaScript
+
+Use the `route()` function in your frontend JavaScript:
+
+<CodeGroup>
+```javascript Basic Usage
+// Redirect to checkout page
+window.location.href = route('checkout');
+
+// Fetch from API endpoint
+const response = await fetch(route('api.cart.get'));
+```
+
+```javascript With Parameters
+// Navigate to product detail page
+window.location.href = route('products.show', { slug: 'my-product' });
+
+// Fetch specific order
+const response = await fetch(route('api.orders.show', { orderId: '123' }));
+
+// API call with route parameters
+const config = await fetch(route('api.payment.config', { providerId: 'pp_stripe' }));
+```
+
+```javascript Form Actions
+// Set form action dynamically
+document.querySelector('form').action = route('api.cart.update');
+
+// AJAX request
+fetch(route('api.orders.checkout'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(orderData)
+});
+```
+</CodeGroup>
+
+<Tip>
+  Named routes make it easy to refactor URLs without breaking links throughout your codebase.
+</Tip>
+
+## Sitemap Routes
+
+Define sitemap routes to expose your plugin content for SEO:
+
+```javascript
+const sitemap = require('./controllers/sitemap');
+
+// Define sitemap route
+router.public('get', '/sitemap-products.xml', sitemap.productsSitemap).as('sitemap.products');
+```
+
+<Note>
+  Sitemap routes must be registered with the sitemap registry in your plugin's `onInit()` hook. See [Sitemaps](/building/sitemaps) for complete details.
+</Note>
 
 ## URL Structure
 
