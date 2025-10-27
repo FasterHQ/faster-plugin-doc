@@ -1,0 +1,840 @@
+---
+title: 'Request Validation'
+description: 'Validate incoming request data with Zod schemas and custom validation logic'
+---
+
+## Overview
+
+Faster CMS provides a powerful request validation system built on [Zod](https://zod.dev/) for type-safe validation. The `BaseRequest` class allows you to define schema validation, authorization checks, and custom validation logic for your API endpoints.
+
+<Info>
+  Request validation helps you catch invalid data early, provide clear error messages, and maintain data integrity.
+</Info>
+
+## Quick Start
+
+Create a request validator by extending `BaseRequest`:
+
+```javascript validators/StoreProductRequest.js
+const {z} = require('zod');
+const {BaseRequest} = require('@fasterhq/plugin-sdk');
+
+class StoreProductRequest extends BaseRequest {
+    authorize() {
+        return true; // or implement authorization logic
+    }
+
+    schema() {
+        return z.object({
+            name: z.string().min(1, 'Product name is required'),
+            price: z.number().positive('Price must be greater than 0'),
+            sku: z.string().optional()
+        });
+    }
+}
+
+module.exports = StoreProductRequest;
+```
+
+## BaseRequest Class
+
+The `BaseRequest` class provides three main hooks you can override:
+
+### 1. authorize()
+
+Check if the user is authorized to make this request:
+
+```javascript
+async authorize() {
+    // Allow all users
+    return true;
+
+    // Or check user permissions
+    return this.context.user && this.context.user.role === 'admin';
+}
+```
+
+### 2. schema()
+
+Define your Zod validation schema:
+
+```javascript
+schema() {
+    return z.object({
+        name: z.string().min(1, 'Name is required'),
+        email: z.string().email('Invalid email format'),
+        age: z.number().min(18, 'Must be 18 or older')
+    });
+}
+```
+
+### 3. customValidation()
+
+Add custom validation logic after schema validation:
+
+```javascript
+async customValidation(validatedData) {
+    const errors = {};
+
+    // Check if email already exists
+    const existing = await User.findOne({ email: validatedData.email });
+    if (existing) {
+        errors.email = ['Email already exists'];
+    }
+
+    return errors;
+}
+```
+
+## Creating Request Validators
+
+### Basic Example
+
+```javascript validators/CreateUserRequest.js
+const {z} = require('zod');
+const {BaseRequest} = require('@fasterhq/plugin-sdk');
+
+class CreateUserRequest extends BaseRequest {
+    authorize() {
+        return true;
+    }
+
+    schema() {
+        return z.object({
+            name: z.string()
+                .min(1, 'Name is required')
+                .max(100, 'Name too long'),
+
+            email: z.string()
+                .email('Invalid email format')
+                .toLowerCase(),
+
+            age: z.number()
+                .min(18, 'Must be 18 or older')
+                .max(120, 'Invalid age'),
+
+            phone: z.string()
+                .regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number')
+                .optional()
+        });
+    }
+}
+
+module.exports = CreateUserRequest;
+```
+
+### With Authorization
+
+```javascript validators/UpdateProductRequest.js
+const {z} = require('zod');
+const {BaseRequest} = require('@fasterhq/plugin-sdk');
+
+class UpdateProductRequest extends BaseRequest {
+    authorize() {
+        // Only allow authenticated admin users
+        return this.context.user && this.context.user.role === 'admin';
+    }
+
+    schema() {
+        return z.object({
+            name: z.string().min(1).optional(),
+            price: z.number().positive().optional(),
+            status: z.enum(['draft', 'published', 'archived']).optional()
+        });
+    }
+}
+
+module.exports = UpdateProductRequest;
+```
+
+### With Custom Validation
+
+```javascript validators/StoreProductRequest.js
+const {z} = require('zod');
+const {BaseRequest} = require('@fasterhq/plugin-sdk');
+const {Product} = require('../models');
+
+class StoreProductRequest extends BaseRequest {
+    authorize() {
+        return true;
+    }
+
+    schema() {
+        return z.object({
+            name: z.string().min(1, 'Product name is required'),
+            sku: z.string().min(1, 'SKU is required'),
+            price: z.number().positive('Price must be greater than 0')
+        });
+    }
+
+    async customValidation(validatedData) {
+        const errors = {};
+
+        // Check if SKU is unique
+        if (validatedData.sku) {
+            const existing = await Product.findPage({
+                filter: `sku:'${validatedData.sku}'`
+            });
+
+            if (existing?.data?.length > 0) {
+                errors.sku = ['SKU already exists. Please use a unique SKU'];
+            }
+        }
+
+        return errors;
+    }
+}
+
+module.exports = StoreProductRequest;
+```
+
+## Zod Schema Types
+
+### String Validation
+
+```javascript
+z.string()
+    .min(1, 'Required')
+    .max(100, 'Too long')
+    .email('Invalid email')
+    .url('Invalid URL')
+    .regex(/^[a-z]+$/, 'Only lowercase letters')
+    .trim()
+    .toLowerCase()
+    .toUpperCase()
+    .optional()
+    .nullable()
+    .default('default value')
+```
+
+### Number Validation
+
+```javascript
+z.number()
+    .min(0, 'Must be non-negative')
+    .max(100, 'Must be 100 or less')
+    .positive('Must be positive')
+    .negative('Must be negative')
+    .int('Must be an integer')
+    .multipleOf(5, 'Must be multiple of 5')
+    .finite('Must be finite')
+    .safe('Must be safe integer')
+    .optional()
+```
+
+### Boolean Validation
+
+```javascript
+z.boolean()
+    .optional()
+    .default(false)
+```
+
+### Enum Validation
+
+```javascript
+z.enum(['draft', 'published', 'archived'], {
+    errorMap: () => ({ message: 'Invalid status' })
+})
+```
+
+### Array Validation
+
+```javascript
+z.array(z.string())
+    .min(1, 'At least one item required')
+    .max(10, 'Too many items')
+    .nonempty('Cannot be empty')
+```
+
+### Object Validation
+
+```javascript
+z.object({
+    name: z.string(),
+    age: z.number()
+})
+    .strict() // No extra keys allowed
+    .partial() // All fields optional
+    .required() // All fields required
+```
+
+### Nested Objects
+
+```javascript
+z.object({
+    user: z.object({
+        name: z.string(),
+        email: z.string().email()
+    }),
+    settings: z.object({
+        theme: z.enum(['light', 'dark']),
+        notifications: z.boolean()
+    })
+})
+```
+
+### Custom Refinements
+
+```javascript
+schema() {
+    return z.object({
+        password: z.string().min(8),
+        confirmPassword: z.string()
+    }).refine(
+        data => data.password === data.confirmPassword,
+        {
+            message: 'Passwords do not match',
+            path: ['confirmPassword']
+        }
+    );
+}
+```
+
+## Using Validators in Routes
+
+### Method 1: Validation Middleware
+
+Use the `validateRequest` middleware factory:
+
+```javascript routes.js
+const {PluginRouter} = require('@fasterhq/plugin-sdk');
+const {validateRequest} = require('./middleware/validateRequest');
+const {StoreProductRequest, UpdateProductRequest} = require('./validators');
+const controller = require('./controllers/products');
+
+const router = new PluginRouter('myplugin');
+
+// Apply validation middleware to specific routes
+router.admin('post', '/products',
+    validateRequest(StoreProductRequest),
+    controller.store
+);
+
+router.admin('put', '/products/:id',
+    validateRequest(UpdateProductRequest),
+    controller.update
+);
+
+module.exports = { router: () => router.router() };
+```
+
+Access validated data in your controller:
+
+```javascript controllers/products.js
+async function store(req, res) {
+    // req.validated contains the validated and sanitized data
+    const product = await Product.create(req.validated);
+
+    res.json({
+        success: true,
+        product
+    });
+}
+```
+
+### Method 2: Manual Validation in Controllers
+
+For more control, validate manually inside controllers:
+
+```javascript controllers/products.js
+const {validate} = require('../middleware/validateRequest');
+const {StoreProductRequest} = require('../validators');
+
+async function store(req, res) {
+    try {
+        // Validate request data
+        const validated = await validate(
+            StoreProductRequest,
+            req.body,
+            {
+                user: req.user,
+                params: req.params
+            }
+        );
+
+        // Use validated data
+        const product = await Product.create(validated);
+
+        res.json({
+            success: true,
+            product
+        });
+    } catch (error) {
+        // error.errors contains validation errors
+        if (error.errors) {
+            return res.status(422).json({
+                success: false,
+                errors: error.errors
+            });
+        }
+
+        throw error;
+    }
+}
+
+module.exports = { store };
+```
+
+### Method 3: Dynamic Model Validation
+
+For generic CRUD endpoints, use dynamic validation:
+
+```javascript middleware/modelValidation.js
+const {validateRequest} = require('./validateRequest');
+const {StoreProductRequest, UpdateProductRequest} = require('../validators');
+
+function modelValidationMiddleware(req, res, next) {
+    const {model} = req.params;
+    const isUpdate = req.method === 'PUT';
+
+    if (model === 'products') {
+        const RequestClass = isUpdate ? UpdateProductRequest : StoreProductRequest;
+        return validateRequest(RequestClass)(req, res, next);
+    }
+
+    // No validation for this model
+    next();
+}
+
+module.exports = modelValidationMiddleware;
+```
+
+Apply to routes:
+
+```javascript routes.js
+router.admin('post', '/data/:model', modelValidationMiddleware, controller.create);
+router.admin('put', '/data/:model/:id', modelValidationMiddleware, controller.update);
+```
+
+## Validation Middleware Helper
+
+Create the validation middleware helper:
+
+```javascript middleware/validateRequest.js
+/**
+ * Middleware factory that validates requests using a Request class
+ * @param {Class} RequestClass - The request validator class (extends BaseRequest)
+ * @returns {Function} Express middleware function
+ */
+function validateRequest(RequestClass) {
+    return async (req, res, next) => {
+        try {
+            const request = new RequestClass(req.body, {
+                user: req.user,
+                params: req.params,
+                query: req.query,
+                headers: req.headers
+            });
+
+            const result = await request.validate();
+
+            if (!result.valid) {
+                return res.status(422).json({
+                    success: false,
+                    errors: result.errors
+                });
+            }
+
+            // Attach validated data to request
+            req.validated = result.data;
+
+            next();
+        } catch (error) {
+            console.error('Validation middleware error:', error);
+            return res.status(500).json({
+                success: false,
+                errors: { general: ['An error occurred during validation'] }
+            });
+        }
+    };
+}
+
+/**
+ * Manual validation helper (for use inside controllers)
+ * @param {Class} RequestClass - The request validator class
+ * @param {Object} data - The data to validate
+ * @param {Object} context - Additional context
+ * @returns {Promise<Object>} Validated data
+ * @throws {Error} Validation error with errors property
+ */
+async function validate(RequestClass, data, context = {}) {
+    const request = new RequestClass(data, context);
+    return await request.validated(); // Throws on validation failure
+}
+
+module.exports = {
+    validateRequest,
+    validate
+};
+```
+
+## Complex Validation Examples
+
+### Variable Products with Variations
+
+```javascript validators/ProductRequest.js
+const {z} = require('zod');
+const {BaseRequest} = require('@fasterhq/plugin-sdk');
+
+class StoreProductRequest extends BaseRequest {
+    authorize() {
+        return true;
+    }
+
+    schema() {
+        return z.object({
+            name: z.string().min(1, 'Product name is required'),
+
+            type: z.enum(['simple', 'variable']).default('simple'),
+
+            price: z.number().positive().optional(),
+
+            variations: z.array(
+                z.object({
+                    sku: z.string().min(1, 'Variation SKU is required'),
+                    price: z.number().positive('Price must be greater than 0'),
+                    stock_quantity: z.number().min(0).default(0),
+                    attributes: z.record(z.string(), z.string())
+                        .refine(obj => Object.keys(obj).length > 0, {
+                            message: 'Variation must have at least one attribute'
+                        })
+                })
+            ).optional(),
+
+            attributes: z.array(
+                z.object({
+                    name: z.string().min(1),
+                    values: z.array(
+                        z.object({
+                            value: z.string().min(1)
+                        })
+                    ).min(1, 'Attribute must have at least one value')
+                })
+            ).optional()
+        })
+        .refine(
+            data => data.type === 'variable' || data.price !== undefined,
+            {
+                message: 'Simple products must have a price',
+                path: ['price']
+            }
+        )
+        .refine(
+            data => data.type !== 'variable' || (data.variations && data.variations.length > 0),
+            {
+                message: 'Variable products must have at least one variation',
+                path: ['variations']
+            }
+        );
+    }
+}
+
+module.exports = StoreProductRequest;
+```
+
+### Update Request with Context
+
+```javascript validators/UpdateProductRequest.js
+const {z} = require('zod');
+const {BaseRequest} = require('@fasterhq/plugin-sdk');
+const {Product} = require('../models');
+
+class UpdateProductRequest extends BaseRequest {
+    authorize() {
+        // Check if user owns this product or is admin
+        return this.context.user &&
+               (this.context.user.role === 'admin' ||
+                this.context.productOwnerId === this.context.user.id);
+    }
+
+    schema() {
+        return z.object({
+            name: z.string().min(1).optional(),
+            sku: z.string().optional(),
+            price: z.number().positive().optional()
+        });
+    }
+
+    async customValidation(validatedData) {
+        const errors = {};
+        const productId = this.context.productId;
+
+        // Check SKU uniqueness (excluding current product)
+        if (validatedData.sku) {
+            const existing = await Product.findPage({
+                filter: `sku:'${validatedData.sku}'`
+            });
+
+            if (existing?.data?.length > 0) {
+                const isDifferentProduct = existing.data.some(
+                    product => product.id !== productId
+                );
+
+                if (isDifferentProduct) {
+                    errors.sku = ['SKU already exists'];
+                }
+            }
+        }
+
+        return errors;
+    }
+}
+
+module.exports = UpdateProductRequest;
+```
+
+## Error Response Format
+
+Validation errors are returned in a consistent format:
+
+```json
+{
+  "success": false,
+  "errors": {
+    "name": ["Product name is required"],
+    "price": ["Price must be greater than 0"],
+    "email": ["Invalid email format", "Email already exists"],
+    "variations": ["Variable products must have at least one variation"]
+  }
+}
+```
+
+**Status Code:** `422 Unprocessable Entity`
+
+## Accessing Context Data
+
+The `context` object passed to the validator contains useful data:
+
+```javascript
+const request = new RequestClass(req.body, {
+    user: req.user,           // Current user
+    params: req.params,       // URL parameters
+    query: req.query,         // Query string parameters
+    headers: req.headers,     // Request headers
+    productId: req.params.id, // Custom context data
+    userId: req.user?.id
+});
+```
+
+Access in your validator:
+
+```javascript
+async authorize() {
+    return this.context.user?.role === 'admin';
+}
+
+async customValidation(validatedData) {
+    const productId = this.context.productId;
+    const userId = this.context.userId;
+    // Use context data...
+}
+```
+
+## BaseRequest API Reference
+
+### Methods
+
+<ParamField path="validate()" type="async function" returns="Promise<Object>">
+  Main validation method. Returns `{valid: boolean, data: Object|null, errors: Object}`.
+</ParamField>
+
+<ParamField path="validated()" type="async function" returns="Promise<Object>">
+  Get validated data. Throws error if validation fails.
+</ParamField>
+
+<ParamField path="passes()" type="async function" returns="Promise<boolean>">
+  Check if validation passes without throwing.
+</ParamField>
+
+<ParamField path="fails()" type="async function" returns="Promise<boolean>">
+  Check if validation fails without throwing.
+</ParamField>
+
+### Overridable Methods
+
+<ParamField path="authorize()" type="async function" returns="Promise<boolean>">
+  Override to implement authorization logic.
+</ParamField>
+
+<ParamField path="schema()" type="function" returns="ZodObject">
+  Override to define your Zod validation schema.
+</ParamField>
+
+<ParamField path="customValidation(validatedData)" type="async function" returns="Promise<Object>">
+  Override to add custom validation logic. Return object with field names as keys and error arrays as values.
+</ParamField>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Organize Validators by Feature" icon="folder">
+    Create a `validators/` directory and group validators by feature:
+    ```
+    validators/
+    ├── ProductRequest.js
+    ├── UserRequest.js
+    ├── OrderRequest.js
+    └── index.js
+    ```
+  </Accordion>
+
+  <Accordion title="Use Clear Error Messages" icon="message">
+    Write user-friendly error messages:
+    ```javascript
+    z.string().min(1, 'Product name is required')
+    z.number().positive('Price must be greater than 0')
+    z.email('Please enter a valid email address')
+    ```
+  </Accordion>
+
+  <Accordion title="Validate Early" icon="shield">
+    Use validation middleware to catch errors before they reach your controller logic:
+    ```javascript
+    router.admin('post', '/products',
+        validateRequest(StoreProductRequest),
+        controller.store
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="Keep Custom Validation Lightweight" icon="gauge">
+    Avoid heavy database queries in `customValidation()`:
+    - Use indexed fields for lookups
+    - Limit the number of queries
+    - Consider caching frequently checked data
+  </Accordion>
+
+  <Accordion title="Separate Create and Update Validators" icon="code-branch">
+    Use different validators for create and update operations:
+    ```javascript
+    class StoreProductRequest extends BaseRequest { /* ... */ }
+    class UpdateProductRequest extends BaseRequest { /* ... */ }
+    ```
+  </Accordion>
+
+  <Accordion title="Use Authorization Properly" icon="lock">
+    Implement proper authorization in the `authorize()` method:
+    ```javascript
+    async authorize() {
+        return this.context.user?.role === 'admin';
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Password Confirmation
+
+```javascript
+schema() {
+    return z.object({
+        password: z.string().min(8, 'Password must be at least 8 characters'),
+        password_confirmation: z.string()
+    }).refine(
+        data => data.password === data.password_confirmation,
+        {
+            message: 'Passwords do not match',
+            path: ['password_confirmation']
+        }
+    );
+}
+```
+
+### Conditional Validation
+
+```javascript
+schema() {
+    return z.object({
+        shipping_required: z.boolean(),
+        shipping_address: z.string().optional()
+    }).refine(
+        data => !data.shipping_required || data.shipping_address,
+        {
+            message: 'Shipping address is required when shipping is required',
+            path: ['shipping_address']
+        }
+    );
+}
+```
+
+### Date Validation
+
+```javascript
+z.string()
+    .refine(val => !isNaN(Date.parse(val)), {
+        message: 'Invalid date format'
+    })
+    .transform(val => new Date(val))
+```
+
+### File Upload Validation
+
+```javascript
+schema() {
+    return z.object({
+        file: z.string().url('Invalid file URL'),
+        file_type: z.enum(['image/png', 'image/jpeg', 'application/pdf']),
+        file_size: z.number().max(5 * 1024 * 1024, 'File size must be less than 5MB')
+    });
+}
+```
+
+## Testing Validators
+
+```javascript test/validators/product-request.test.js
+const {StoreProductRequest} = require('../validators/ProductRequest');
+
+describe('StoreProductRequest', () => {
+    it('should validate valid product data', async () => {
+        const request = new StoreProductRequest({
+            name: 'Test Product',
+            price: 99.99,
+            sku: 'TEST-001'
+        });
+
+        const result = await request.validate();
+        expect(result.valid).toBe(true);
+        expect(result.data.name).toBe('Test Product');
+    });
+
+    it('should fail when name is missing', async () => {
+        const request = new StoreProductRequest({
+            price: 99.99
+        });
+
+        const result = await request.validate();
+        expect(result.valid).toBe(false);
+        expect(result.errors.name).toBeDefined();
+    });
+
+    it('should fail when price is negative', async () => {
+        const request = new StoreProductRequest({
+            name: 'Test Product',
+            price: -10
+        });
+
+        const result = await request.validate();
+        expect(result.valid).toBe(false);
+        expect(result.errors.price).toContain('Price must be greater than 0');
+    });
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Controllers" icon="code" href="/building/controllers">
+    Use validated data in your controllers
+  </Card>
+  <Card title="Routes" icon="route" href="/core-concepts/routing-system">
+    Apply validation middleware to routes
+  </Card>
+  <Card title="Models" icon="database" href="/core-concepts/models">
+    Work with validated data in models
+  </Card>
+  <Card title="Zod Documentation" icon="book" href="https://zod.dev">
+    Learn more about Zod schemas
+  </Card>
+</CardGroup>
