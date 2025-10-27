@@ -47,6 +47,7 @@ class MyPlugin extends BasePlugin {
 Called when the plugin is initialized. This is where you:
 - Register services
 - Register providers
+- Register sitemaps
 - Set up internal state
 
 ```javascript
@@ -60,6 +61,19 @@ async onInit() {
     // 2. Initialize any async resources
     await this.services.myService.init();
 
+    // 3. Register sitemap (runs on every plugin init)
+    try {
+        const pluginSitemapRegistry = require('../../../core/server/services/plugin-sitemap-registry');
+        pluginSitemapRegistry.register({
+            name: this.name,
+            sitemapUrl: 'myplugin/sitemap-items.xml',
+            lastModified: new Date()
+        });
+        this.debug('Sitemap registered successfully');
+    } catch (error) {
+        this.debug('Failed to register sitemap:', error.message);
+    }
+
     this.debug('Plugin initialized successfully');
 }
 ```
@@ -72,7 +86,6 @@ async onInit() {
 
 Called when the plugin is activated. Use this to:
 - Register with external systems
-- Register sitemaps
 - Set up webhooks
 - Perform one-time setup
 
@@ -80,18 +93,8 @@ Called when the plugin is activated. Use this to:
 async onActivate() {
     this.debug('Activating plugin');
 
-    // Register sitemap for SEO
-    try {
-        const pluginSitemapRegistry = require('../../../core/server/services/plugin-sitemap-registry');
-        pluginSitemapRegistry.register({
-            name: this.name,
-            sitemapUrl: '/your-plugin/sitemap.xml',
-            lastModified: new Date()
-        });
-        this.debug('Sitemap registered successfully');
-    } catch (error) {
-        this.debug('Failed to register sitemap:', error.message);
-    }
+    // Perform one-time setup tasks
+    // e.g., register webhooks, initialize external services
 
     this.debug('Plugin activated');
 }
